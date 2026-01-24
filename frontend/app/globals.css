@@ -43,6 +43,24 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+  
+  /* Add Money Flow Theme Colors */
+  --theme-bg: #FFFCEE;
+  --theme-bg-light: #E8F1EB;
+  --theme-bg-disabled: #C8E6D0;
+  --theme-primary: #1B7339;
+  --theme-primary-dark: #008751;
+  --theme-text: #141414;
+  --theme-text-secondary: #595959;
+  --theme-text-muted: #747474;
+  --theme-border: #303030;
+  --theme-border-dark: #2C2C2C;
+  --theme-gold: #FFD700;
+  --theme-usdc: #2775CA;
+  --theme-bitcoin: #F7931A;
+  --theme-ethereum: #627EEA;
+  --theme-overlay: rgba(0, 0, 0, 0.5);
+  --theme-overlay-dark: rgba(0, 0, 0, 0.7);
 }
 
 * {
@@ -892,6 +910,24 @@ button.ghost {
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  
+  /* Add Money Flow Theme Colors */
+  --color-theme-bg: var(--theme-bg);
+  --color-theme-bg-light: var(--theme-bg-light);
+  --color-theme-bg-disabled: var(--theme-bg-disabled);
+  --color-theme-primary: var(--theme-primary);
+  --color-theme-primary-dark: var(--theme-primary-dark);
+  --color-theme-text: var(--theme-text);
+  --color-theme-text-secondary: var(--theme-text-secondary);
+  --color-theme-text-muted: var(--theme-text-muted);
+  --color-theme-border: var(--theme-border);
+  --color-theme-border-dark: var(--theme-border-dark);
+  --color-theme-gold: var(--theme-gold);
+  --color-theme-usdc: var(--theme-usdc);
+  --color-theme-bitcoin: var(--theme-bitcoin);
+  --color-theme-ethereum: var(--theme-ethereum);
+  --color-theme-overlay: var(--theme-overlay);
+  --color-theme-overlay-dark: var(--theme-overlay-dark);
 }
 
 .dark {
