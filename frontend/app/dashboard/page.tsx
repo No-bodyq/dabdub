@@ -70,7 +70,10 @@ export default function Dashboard() {
               <Eye className="text-[#141414] stroke-current" />
             </div>
             <div className="grid grid-cols-2 gap-[1rem] mt-[2rem] text-[#303030] font-bold">
-              <Link href="/add-money" className="w-full rounded-full flex justify-center gap-[0.5rem]  bg-[#FFFFFF14] border border-[#FFFFFF] px-[0.5rem] py-[0.25rem] hover:bg-[#FFFFFF24] transition-colors">
+              <Link
+                href="/add-money"
+                className="w-full rounded-full flex justify-center gap-[0.5rem]  bg-[#FFFFFF14] border border-[#FFFFFF] px-[0.5rem] py-[0.25rem] hover:bg-[#FFFFFF24] transition-colors"
+              >
                 <MoveDown />
                 <h3>Add</h3>
               </Link>
@@ -82,10 +85,13 @@ export default function Dashboard() {
           </div>
         </div>
         <div className="w-full grid grid-cols-2 gap-[1rem]  text-[#FFFFFF]  text-base font-bold">
-          <div className="w-full rounded-full flex justify-center gap-[0.5rem]  bg-[#1B7339]    py-[0.5rem]">
+          <Link
+            href="/send-money"
+            className="w-full rounded-full flex justify-center gap-[0.5rem]  bg-[#1B7339]    py-[0.5rem]"
+          >
             <MoveUpRight />
             <h3>Send</h3>
-          </div>
+          </Link>
           <Drawer>
             <DrawerTrigger>
               <div className="w-full rounded-full flex gap-[0.5rem]  bg-[#1B7339] py-[.5rem] justify-center">
