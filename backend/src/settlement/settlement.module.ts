@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { Settlement } from './entities/settlement.entity';
+import { SettlementEntity } from '../database/entities/settlement.entity';
 import { SettlementRepository } from './repositories/settlement.repository';
+import { SettlementService } from './services/settlement.service';
+import { SettlementController } from './controllers/settlement.controller';
 
 import { SettlementService } from './settlement.service';
 import { MockPartnerService } from './services/mock-partner.service';
