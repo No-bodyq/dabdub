@@ -32,26 +32,26 @@ export enum SettlementProvider {
 @Index(['paymentRequestId'], { unique: true })
 export class Settlement {
   @PrimaryGeneratedColumn('uuid')
-  id: string;
+  id!: string;
 
   @Column({ name: 'payment_request_id', type: 'uuid', unique: true })
-  paymentRequestId: string;
+  paymentRequestId!: string;
 
   @Column({ name: 'merchant_id', type: 'uuid' })
-  merchantId: string;
+  merchantId!: string;
 
   @Column({ type: 'decimal', precision: 19, scale: 4 })
-  amount: number;
+  amount!: number;
 
   @Column({ type: 'varchar', length: 3 })
-  currency: string;
+  currency!: string;
 
   @Column({
     type: 'enum',
     enum: SettlementStatus,
     default: SettlementStatus.PENDING,
   })
-  status: SettlementStatus;
+  status!: SettlementStatus;
 
   // Bank transfer details
   @Column({
@@ -60,7 +60,7 @@ export class Settlement {
     length: 50,
     nullable: true,
   })
-  bankAccountNumber: string;
+  bankAccountNumber?: string;
 
   @Column({
     name: 'bank_routing_number',
@@ -68,10 +68,10 @@ export class Settlement {
     length: 50,
     nullable: true,
   })
-  bankRoutingNumber: string;
+  bankRoutingNumber?: string;
 
   @Column({ name: 'bank_name', type: 'varchar', length: 255, nullable: true })
-  bankName: string;
+  bankName?: string;
 
   @Column({
     name: 'bank_account_holder_name',
@@ -79,7 +79,7 @@ export class Settlement {
     length: 255,
     nullable: true,
   })
-  bankAccountHolderName: string;
+  bankAccountHolderName?: string;
 
   @Column({
     name: 'bank_swift_code',
@@ -87,17 +87,17 @@ export class Settlement {
     length: 11,
     nullable: true,
   })
-  bankSwiftCode: string;
+  bankSwiftCode?: string;
 
   @Column({ name: 'bank_iban', type: 'varchar', length: 34, nullable: true })
-  bankIban: string;
+  bankIban?: string;
 
   // Settlement batch support
   @Column({ name: 'batch_id', type: 'uuid', nullable: true })
-  batchId: string;
+  batchId?: string;
 
   @Column({ name: 'batch_sequence', type: 'int', nullable: true })
-  batchSequence: number;
+  batchSequence?: number;
 
   // Fee calculation and tracking
   @Column({
@@ -107,7 +107,7 @@ export class Settlement {
     scale: 4,
     default: 0,
   })
-  feeAmount: number;
+  feeAmount!: number;
 
   @Column({
     name: 'fee_percentage',
@@ -116,10 +116,10 @@ export class Settlement {
     scale: 4,
     nullable: true,
   })
-  feePercentage: number;
+  feePercentage?: number;
 
   @Column({ name: 'net_amount', type: 'decimal', precision: 19, scale: 4 })
-  netAmount: number;
+  netAmount!: number;
 
   // Exchange rate at settlement time
   @Column({
@@ -129,7 +129,7 @@ export class Settlement {
     scale: 8,
     nullable: true,
   })
-  exchangeRate: number;
+  exchangeRate?: number;
 
   @Column({
     name: 'source_currency',
@@ -137,7 +137,7 @@ export class Settlement {
     length: 3,
     nullable: true,
   })
-  sourceCurrency: string;
+  sourceCurrency?: string;
 
   // Settlement provider
   @Column({
@@ -145,7 +145,7 @@ export class Settlement {
     enum: SettlementProvider,
     nullable: true,
   })
-  provider: SettlementProvider;
+  provider?: SettlementProvider;
 
   @Column({
     name: 'provider_reference',
@@ -153,7 +153,7 @@ export class Settlement {
     length: 255,
     nullable: true,
   })
-  providerReference: string;
+  providerReference?: string;
 
   // Settlement receipt/reference number
   @Column({
@@ -163,7 +163,7 @@ export class Settlement {
     nullable: true,
     unique: true,
   })
-  settlementReceipt: string;
+  settlementReceipt?: string;
 
   @Column({
     name: 'settlement_reference',
@@ -171,34 +171,34 @@ export class Settlement {
     length: 255,
     nullable: true,
   })
-  settlementReference: string;
+  settlementReference?: string;
 
   // Failure reason and retry count
   @Column({ name: 'failure_reason', type: 'text', nullable: true })
-  failureReason: string;
+  failureReason?: string;
 
   @Column({ name: 'retry_count', type: 'int', default: 0 })
-  retryCount: number;
+  retryCount!: number;
 
   @Column({ name: 'max_retries', type: 'int', default: 3 })
-  maxRetries: number;
+  maxRetries!: number;
 
   // Timestamps
   @Column({ name: 'settled_at', type: 'timestamp', nullable: true })
-  settledAt: Date;
+  settledAt?: Date;
 
   @Column({ name: 'processed_at', type: 'timestamp', nullable: true })
-  processedAt: Date;
+  processedAt?: Date;
 
   @CreateDateColumn({ name: 'created_at' })
-  createdAt: Date;
+  createdAt!: Date;
 
   @UpdateDateColumn({ name: 'updated_at' })
-  updatedAt: Date;
+  updatedAt!: Date;
 
   // Settlement metadata JSON field
   @Column({ type: 'jsonb', nullable: true })
-  metadata: Record<string, any>;
+  metadata?: Record<string, any>;
 
   // Relationships
   // Note: These will be properly configured once PaymentRequest and Merchant entities exist

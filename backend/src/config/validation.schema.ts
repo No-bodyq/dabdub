@@ -3,7 +3,7 @@ import * as Joi from 'joi';
 export const validationSchema = Joi.object({
   // App Configuration
   NODE_ENV: Joi.string()
-    .valid('development', 'staging', 'production')
+    .valid('development', 'staging', 'production', 'test')
     .default('development'),
   PORT: Joi.number().default(4000),
   DEBUG: Joi.boolean().default(false),
@@ -12,7 +12,7 @@ export const validationSchema = Joi.object({
   DB_HOST: Joi.string().default('localhost'),
   DB_PORT: Joi.number().default(5432),
   DB_USERNAME: Joi.string().default('postgres'),
-  DB_PASSWORD: Joi.string().default(''),
+  DB_PASSWORD: Joi.string().allow('').default(''),
   DB_NAME: Joi.string().default('dabdub_dev'),
   DB_POOL_SIZE: Joi.number().default(10),
 

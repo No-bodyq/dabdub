@@ -22,6 +22,17 @@ async function bootstrap() {
   // Global validation pipe
   app.useGlobalPipes(new CustomValidationPipe());
 
+  // Swagger Documentation
+  const { DocumentBuilder, SwaggerModule } = await import('@nestjs/swagger');
+  const config = new DocumentBuilder()
+    .setTitle('Dabdub Webhooks API')
+    .setDescription('The Dabdub Webhooks Management API')
+    .setVersion('1.0')
+    .addTag('Webhooks')
+    .build();
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api/docs', app, document);
+
   await app.listen(process.env.PORT ?? 3000);
 }
 bootstrap();

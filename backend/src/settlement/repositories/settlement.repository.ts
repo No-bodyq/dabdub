@@ -103,7 +103,9 @@ export class SettlementRepository {
     }
 
     await this.repository.update(id, updateData);
-    return this.findOne(id);
+    const updated = await this.findOne(id);
+    if (!updated) throw new Error(`Settlement ${id} not found`);
+    return updated;
   }
 
   async incrementRetryCount(id: string): Promise<Settlement> {
@@ -120,7 +122,9 @@ export class SettlementRepository {
     updateData: Partial<Settlement>,
   ): Promise<Settlement> {
     await this.repository.update(id, updateData);
-    return this.findOne(id);
+    const updated = await this.findOne(id);
+    if (!updated) throw new Error(`Settlement ${id} not found`);
+    return updated;
   }
 
   async delete(id: string): Promise<void> {

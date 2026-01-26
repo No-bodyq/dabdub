@@ -8,8 +8,10 @@ import { CacheModule } from './cache/cache.module';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
 import { GlobalConfigModule } from './config/config.module';
 
+import { WebhooksModule } from './webhooks/webhooks.module';
+
 @Module({
-  imports: [GlobalConfigModule, DatabaseModule, LoggerModule],
+  imports: [GlobalConfigModule, DatabaseModule, LoggerModule, WebhooksModule],
   controllers: [AppController],
   providers: [AppService],
 })

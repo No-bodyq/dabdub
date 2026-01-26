@@ -24,6 +24,10 @@ export class WebhookConfiguration {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
+  @Index()
+  @Column({ name: 'merchant_id', type: 'uuid' })
+  merchantId!: string;
+
   @Column({ type: 'varchar', length: 500 })
   url!: string;
 

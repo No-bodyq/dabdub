@@ -9,8 +9,8 @@ import { Injectable, Controller, Post, Body, Get, Param } from '@nestjs/common';
 import {
   NotFoundException,
   BadRequestException,
-  InsufficientFundsException,
-  WalletNotFoundException,
+  // InsufficientFundsException,
+  // WalletNotFoundException,
   ValidationException,
 } from '../exceptions/http-exceptions';
 import { IsEmail, IsNotEmpty, MinLength } from 'class-validator';
@@ -24,19 +24,16 @@ export class WalletService {
   async getWallet(walletId: string) {
     const wallet = await this.findWallet(walletId);
     if (!wallet) {
-      throw new WalletNotFoundException(walletId);
+      throw new NotFoundException(`Wallet ${walletId} not found`);
     }
     return wallet;
   }
 
   async transfer(walletId: string, amount: number) {
-    const wallet = await this.getWallet(walletId);
+    const wallet: any = await this.getWallet(walletId);
 
     if (wallet.balance < amount) {
-      throw new InsufficientFundsException(wallet.balance, amount, {
-        walletId,
-        transactionType: 'transfer',
-      });
+      throw new BadRequestException('Insufficient funds');
     }
 
     // Process transfer...
@@ -56,11 +53,11 @@ export class WalletService {
 export class CreateUserDto {
   @IsEmail()
   @IsNotEmpty()
-  email: string;
+  email!: string;
 
   @IsNotEmpty()
   @MinLength(8)
-  password: string;
+  password!: string;
 }
 
 @Controller('users')
@@ -69,6 +66,7 @@ export class UserController {
   async createUser(@Body() createUserDto: CreateUserDto) {
     // Validation happens automatically via CustomValidationPipe
     // If validation fails, a ValidationException is thrown with detailed errors
+    console.log(createUserDto);
     return { message: 'User created' };
   }
 }
@@ -107,11 +105,12 @@ export class PaymentService {
 
 @Controller('wallets')
 export class WalletController {
+  constructor(private readonly walletService: WalletService) {}
+
   @Get(':id')
   async getWallet(@Param('id') id: string) {
     const wallet = await this.walletService.getWallet(id);
-    // If wallet not found, WalletNotFoundException is thrown
-    // which extends NotFoundException
+    // If wallet not found, NotFoundException is thrown
     return wallet;
   }
 }

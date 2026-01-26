@@ -29,6 +29,10 @@ export class WebhookDeliveryLog {
   @Column({ name: 'webhook_config_id', type: 'uuid' })
   webhookConfigId!: string;
 
+  @Index()
+  @Column({ name: 'merchant_id', type: 'uuid' })
+  merchantId!: string;
+
   @Column({ name: 'payment_request_id', type: 'uuid', nullable: true })
   paymentRequestId?: string;
 
