@@ -1,7 +1,7 @@
 import { Module, Global, DynamicModule, Logger } from '@nestjs/common';
 import { CacheModule as NestCacheModule } from '@nestjs/cache-manager';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { redisStore } from 'cache-manager-redis-store';
+import * as redisStore from 'cache-manager-redis-store';
 import Redis, { Cluster } from 'ioredis';
 import cacheConfig from './cache.config';
 import { CacheService } from './cache.service';
@@ -20,46 +20,46 @@ export class CacheModule {
         NestCacheModule.registerAsync({
           imports: [ConfigModule],
           useFactory: async (configService: ConfigService) => {
-            const cacheConfig =
+            const config =
               configService.get<ReturnType<typeof cacheConfig>>('cache');
 
-            if (!cacheConfig) {
+            if (!config) {
               throw new Error('Cache configuration not found');
             }
 
             const logger = new Logger('CacheModule');
 
             // Handle Redis cluster configuration
-            if (cacheConfig.cluster?.enabled) {
-              const cluster = new Cluster(cacheConfig.cluster.nodes, {
-                ...cacheConfig.cluster.options,
-                maxRetriesPerRequest: cacheConfig.maxRetriesPerRequest,
-                enableReadyCheck: cacheConfig.enableReadyCheck,
-                enableOfflineQueue: cacheConfig.enableOfflineQueue,
+            if (config.cluster?.enabled) {
+              const cluster = new Cluster(config.cluster.nodes, {
+                ...config.cluster.options,
+                // maxRetriesPerRequest removed as it is not in ClusterOptions
+                enableReadyCheck: config.enableReadyCheck,
+                enableOfflineQueue: config.enableOfflineQueue,
               });
 
               return {
                 store: redisStore,
-                host: cacheConfig.cluster.nodes[0]?.host || 'localhost',
-                port: cacheConfig.cluster.nodes[0]?.port || 6379,
-                ttl: cacheConfig.defaultTtl * 1000, // Convert to milliseconds
+                host: config.cluster.nodes[0]?.host || 'localhost',
+                port: config.cluster.nodes[0]?.port || 6379,
+                ttl: config.defaultTtl * 1000, // Convert to milliseconds
                 client: cluster,
               };
             }
 
             // Standard Redis configuration
             const redisClient = new Redis({
-              host: cacheConfig.host,
-              port: cacheConfig.port,
-              password: cacheConfig.password,
-              db: cacheConfig.db,
-              tls: cacheConfig.tls,
-              maxRetries: cacheConfig.maxRetries,
-              retryDelayOnFailover: cacheConfig.retryDelayOnFailover,
-              enableReadyCheck: cacheConfig.enableReadyCheck,
-              maxRetriesPerRequest: cacheConfig.maxRetriesPerRequest,
-              lazyConnect: cacheConfig.lazyConnect,
-              enableOfflineQueue: cacheConfig.enableOfflineQueue,
+              host: config.host,
+              port: config.port,
+              password: config.password,
+              db: config.db,
+              tls: config.tls,
+              // maxRetries removed as it is not in RedisOptions
+              retryStrategy: (times) => Math.min(times * 50, 2000),
+              enableReadyCheck: config.enableReadyCheck,
+              maxRetriesPerRequest: config.maxRetriesPerRequest,
+              lazyConnect: config.lazyConnect,
+              enableOfflineQueue: config.enableOfflineQueue,
             });
 
             // Handle connection events
@@ -81,11 +81,11 @@ export class CacheModule {
 
             return {
               store: redisStore,
-              host: cacheConfig.host,
-              port: cacheConfig.port,
-              password: cacheConfig.password,
-              db: cacheConfig.db,
-              ttl: cacheConfig.defaultTtl * 1000, // Convert to milliseconds
+              host: config.host,
+              port: config.port,
+              password: config.password,
+              db: config.db,
+              ttl: config.defaultTtl * 1000, // Convert to milliseconds
               client: redisClient,
             };
           },

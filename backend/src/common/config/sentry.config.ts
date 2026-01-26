@@ -25,7 +25,7 @@ export function initSentry(): void {
       // Add more integrations as needed
     ],
     // Filter out sensitive data
-    beforeSend(event, hint) {
+    beforeSend(event: any, hint: any) {
       // Remove sensitive data from event
       if (event.request) {
         // Sanitize headers
