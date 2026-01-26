@@ -3,8 +3,10 @@ import { ConfigService } from '@nestjs/config';
 import {
   AppConfig,
   DatabaseConfig,
+  RedisConfig,
   BlockchainConfig,
   ApiConfig,
+  NotificationConfig,
 } from './interfaces/config.interface';
 
 @Injectable()
@@ -103,6 +105,15 @@ export class GlobalConfigService {
     return this.getDatabaseConfig();
   }
 
+  // Redis Configuration
+  getRedisConfig(): RedisConfig {
+    return this.getCachedConfig(
+      'redis',
+      () =>
+        this.configService.get<RedisConfig>('redis') || ({} as RedisConfig),
+    );
+  }
+
   // Blockchain Configuration
   getBlockchainConfig(): BlockchainConfig {
     return this.getCachedConfig(
@@ -151,6 +162,28 @@ export class GlobalConfigService {
 
   getJwtExpiry(): string {
     return this.getApiConfig().jwtExpiry || '24h';
+  }
+
+  // Notification Configuration
+  getNotificationConfig(): NotificationConfig {
+    return this.getCachedConfig(
+      'notification',
+      () =>
+        this.configService.get<NotificationConfig>('notification') ||
+        ({} as NotificationConfig),
+    );
+  }
+
+  getEmailConfig(): NotificationConfig['email'] {
+    return this.getNotificationConfig().email || {};
+  }
+
+  getSmsConfig(): NotificationConfig['sms'] {
+    return this.getNotificationConfig().sms || {};
+  }
+
+  getPushConfig(): NotificationConfig['push'] {
+    return this.getNotificationConfig().push || {};
   }
 
   // Caching

@@ -15,6 +15,11 @@ export interface DatabaseConfig {
   logging: boolean;
 }
 
+export interface RedisConfig {
+  host: string;
+  port: number;
+}
+
 export interface BlockchainConfig {
   rpcEndpoint: string;
   settlementPrivateKey: string;
@@ -26,6 +31,23 @@ export interface ApiConfig {
   jwtExpiry?: string;
 }
 
+export interface NotificationConfig {
+  email: {
+    sendgridApiKey?: string;
+    fromEmail?: string;
+  };
+  sms: {
+    twilioAccountSid?: string;
+    twilioAuthToken?: string;
+    twilioPhoneNumber?: string;
+  };
+  push: {
+    firebasePrivateKey?: string;
+    firebaseProjectId?: string;
+    firebaseClientEmail?: string;
+  };
+}
+
 export interface ValidationConfig {
   required: string[];
   optional: string[];
@@ -34,6 +56,8 @@ export interface ValidationConfig {
 export interface Config {
   app: AppConfig;
   database: DatabaseConfig;
+  redis: RedisConfig;
   blockchain: BlockchainConfig;
   api: ApiConfig;
+  notification: NotificationConfig;
 }
