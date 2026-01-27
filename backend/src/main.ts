@@ -5,6 +5,7 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { CustomValidationPipe } from './common/pipes/validation.pipe';
 import { initSentry } from './common/config/sentry.config';
+import helmet from 'helmet';
 
 async function bootstrap() {
   // Initialize Sentry before creating the app
@@ -21,6 +22,12 @@ async function bootstrap() {
 
   // Global validation pipe
   app.useGlobalPipes(new CustomValidationPipe());
+
+  // Enable CORS for public access
+  app.enableCors();
+
+  // Use helmet for security headers
+  app.use(helmet());
 
   await app.listen(process.env.PORT ?? 3000);
 }
