@@ -53,6 +53,24 @@ export interface ValidationConfig {
   optional: string[];
 }
 
+export interface StellarNetworkConfig {
+  rpcUrl: string;
+  networkPassphrase: string;
+  horizonUrl: string;
+  vaultContractId: string;
+  walletFactoryContractId: string;
+  usdcTokenId: string;
+  backendSecretKey: string;
+}
+
+export interface StellarConfig {
+  activeNetwork: 'testnet' | 'mainnet' | 'futurenet';
+  networks: Record<string, StellarNetworkConfig>;
+  defaultExpirationMinutes: number;
+  minPaymentAmount: number;
+  maxPaymentAmount: number;
+}
+
 export interface Config {
   app: AppConfig;
   database: DatabaseConfig;
@@ -60,4 +78,5 @@ export interface Config {
   blockchain: BlockchainConfig;
   api: ApiConfig;
   notification: NotificationConfig;
+  stellar: StellarConfig;
 }

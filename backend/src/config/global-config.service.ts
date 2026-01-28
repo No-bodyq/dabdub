@@ -7,6 +7,7 @@ import {
   BlockchainConfig,
   ApiConfig,
   NotificationConfig,
+  StellarConfig,
 } from './interfaces/config.interface';
 
 @Injectable()
@@ -184,6 +185,22 @@ export class GlobalConfigService {
 
   getPushConfig(): NotificationConfig['push'] {
     return this.getNotificationConfig().push || {};
+  }
+
+  // Stellar Configuration
+  getStellarConfig(): StellarConfig {
+    return this.getCachedConfig(
+      'stellar',
+      () =>
+        this.configService.get<StellarConfig>('stellar') ||
+        ({
+          activeNetwork: 'testnet',
+          networks: {},
+          defaultExpirationMinutes: 30,
+          minPaymentAmount: 0.1,
+          maxPaymentAmount: 10000,
+        } as StellarConfig),
+    );
   }
 
   // Caching

@@ -76,6 +76,21 @@ export enum ErrorCode {
   PAYMENT_PROCESSING_ERROR = '7003',
   INVALID_PAYMENT_METHOD = '7004',
   PAYMENT_TIMEOUT = '7005',
+
+  // Payment Request Errors (8xxx)
+  PAYMENT_REQUEST_NOT_FOUND = '8000',
+  PAYMENT_REQUEST_EXPIRED = '8001',
+  PAYMENT_REQUEST_INVALID_STATUS = '8002',
+  PAYMENT_REQUEST_DUPLICATE = '8003',
+  PAYMENT_REQUEST_AMOUNT_TOO_LOW = '8004',
+  PAYMENT_REQUEST_AMOUNT_TOO_HIGH = '8005',
+  PAYMENT_REQUEST_ALREADY_PROCESSED = '8006',
+  PAYMENT_REQUEST_CANNOT_CANCEL = '8007',
+  PAYMENT_REQUEST_QR_FAILED = '8008',
+
+  // Stellar Errors (81xx)
+  STELLAR_CONTRACT_ERROR = '8100',
+  STELLAR_NETWORK_ERROR = '8101',
 }
 
 /**
@@ -354,5 +369,64 @@ export const ErrorCodeMetadata: Record<
     message: 'Payment timeout',
     httpStatus: 504,
     userMessage: 'The payment request timed out. Please try again.',
+  },
+
+  // Payment Request Errors
+  [ErrorCode.PAYMENT_REQUEST_NOT_FOUND]: {
+    message: 'Payment request not found',
+    httpStatus: 404,
+    userMessage: 'The payment request was not found.',
+  },
+  [ErrorCode.PAYMENT_REQUEST_EXPIRED]: {
+    message: 'Payment request has expired',
+    httpStatus: 410,
+    userMessage: 'This payment request has expired.',
+  },
+  [ErrorCode.PAYMENT_REQUEST_INVALID_STATUS]: {
+    message: 'Invalid payment request status transition',
+    httpStatus: 400,
+    userMessage: 'This action is not allowed for the current payment request status.',
+  },
+  [ErrorCode.PAYMENT_REQUEST_DUPLICATE]: {
+    message: 'Duplicate payment request',
+    httpStatus: 409,
+    userMessage: 'A payment request with this idempotency key already exists.',
+  },
+  [ErrorCode.PAYMENT_REQUEST_AMOUNT_TOO_LOW]: {
+    message: 'Payment request amount is below the minimum',
+    httpStatus: 400,
+    userMessage: 'The payment amount is below the minimum allowed.',
+  },
+  [ErrorCode.PAYMENT_REQUEST_AMOUNT_TOO_HIGH]: {
+    message: 'Payment request amount exceeds the maximum',
+    httpStatus: 400,
+    userMessage: 'The payment amount exceeds the maximum allowed.',
+  },
+  [ErrorCode.PAYMENT_REQUEST_ALREADY_PROCESSED]: {
+    message: 'Payment request has already been processed',
+    httpStatus: 409,
+    userMessage: 'This payment request has already been processed.',
+  },
+  [ErrorCode.PAYMENT_REQUEST_CANNOT_CANCEL]: {
+    message: 'Payment request cannot be cancelled',
+    httpStatus: 400,
+    userMessage: 'This payment request cannot be cancelled in its current state.',
+  },
+  [ErrorCode.PAYMENT_REQUEST_QR_FAILED]: {
+    message: 'Failed to generate QR code',
+    httpStatus: 500,
+    userMessage: 'Failed to generate the QR code. Please try again.',
+  },
+
+  // Stellar Errors
+  [ErrorCode.STELLAR_CONTRACT_ERROR]: {
+    message: 'Stellar smart contract error',
+    httpStatus: 502,
+    userMessage: 'An error occurred communicating with the blockchain. Please try again.',
+  },
+  [ErrorCode.STELLAR_NETWORK_ERROR]: {
+    message: 'Stellar network error',
+    httpStatus: 503,
+    userMessage: 'The Stellar network is currently unavailable. Please try again later.',
   },
 };

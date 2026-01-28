@@ -14,8 +14,11 @@ import { Settlement } from '../../settlement/entities/settlement.entity';
 
 export enum PaymentRequestStatus {
     PENDING = 'pending',
+    PROCESSING = 'processing',
     COMPLETED = 'completed',
     FAILED = 'failed',
+    CANCELLED = 'cancelled',
+    EXPIRED = 'expired',
     REFUNDED = 'refunded',
 }
 
@@ -28,6 +31,11 @@ export enum PaymentRequestType {
 @Index(['merchantId'])
 @Index(['status'])
 @Index(['createdAt'])
+@Index(['expiresAt'])
+@Index(['stellarNetwork'])
+@Index(['customerEmail'])
+@Index(['idempotencyKey'], { unique: true, where: '"idempotency_key" IS NOT NULL' })
+@Index(['onChainPaymentId'], { unique: true, where: '"on_chain_payment_id" IS NOT NULL' })
 export class PaymentRequest {
     @PrimaryGeneratedColumn('uuid')
     id!: string;
@@ -35,7 +43,7 @@ export class PaymentRequest {
     @Column({ name: 'merchant_id', type: 'uuid' })
     merchantId!: string;
 
-    @Column({ type: 'decimal', precision: 19, scale: 4 })
+    @Column({ type: 'decimal', precision: 19, scale: 7 })
     amount!: number;
 
     @Column({ type: 'varchar', length: 3 })
@@ -57,6 +65,48 @@ export class PaymentRequest {
 
     @Column({ name: 'description', type: 'text', nullable: true })
     description!: string;
+
+    @Column({ name: 'stellar_network', type: 'varchar', length: 20, nullable: true })
+    stellarNetwork!: string;
+
+    @Column({ name: 'on_chain_payment_id', type: 'varchar', length: 64, unique: false, nullable: true })
+    onChainPaymentId!: string;
+
+    @Column({ name: 'on_chain_tx_hash', type: 'varchar', length: 128, nullable: true })
+    onChainTxHash!: string;
+
+    @Column({ name: 'user_wallet_address', type: 'varchar', length: 56, nullable: true })
+    userWalletAddress!: string;
+
+    @Column({ name: 'fee_amount', type: 'decimal', precision: 19, scale: 7, default: 0 })
+    feeAmount!: number;
+
+    @Column({ name: 'customer_name', type: 'varchar', length: 255, nullable: true })
+    customerName!: string;
+
+    @Column({ name: 'customer_email', type: 'varchar', length: 255, nullable: true })
+    customerEmail!: string;
+
+    @Column({ name: 'customer_phone', type: 'varchar', length: 50, nullable: true })
+    customerPhone!: string;
+
+    @Column({ name: 'expires_at', type: 'timestamp', nullable: true })
+    expiresAt!: Date;
+
+    @Column({ name: 'cancelled_at', type: 'timestamp', nullable: true })
+    cancelledAt!: Date;
+
+    @Column({ name: 'idempotency_key', type: 'varchar', length: 255, nullable: true })
+    idempotencyKey!: string;
+
+    @Column({ name: 'qr_code_data', type: 'text', nullable: true })
+    qrCodeData!: string;
+
+    @Column({ name: 'status_history', type: 'jsonb', default: '[]' })
+    statusHistory!: Array<{ status: string; timestamp: string; reason?: string }>;
+
+    @Column({ type: 'jsonb', nullable: true })
+    metadata!: Record<string, any>;
 
     @CreateDateColumn({ name: 'created_at' })
     createdAt!: Date;
