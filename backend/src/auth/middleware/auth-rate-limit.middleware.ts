@@ -1,4 +1,4 @@
-import { Injectable, NestMiddleware, TooManyRequestsException } from '@nestjs/common';
+import { Injectable, NestMiddleware, HttpException, HttpStatus } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
 
 interface RateLimitStore {
@@ -25,8 +25,9 @@ export class AuthRateLimitMiddleware implements NestMiddleware {
     if (record) {
       if (now < record.resetTime) {
         if (record.attempts >= this.maxAttempts) {
-          throw new TooManyRequestsException(
+          throw new HttpException(
             `Too many login attempts. Please try again after ${Math.ceil((record.resetTime - now) / 60000)} minutes`,
+            HttpStatus.TOO_MANY_REQUESTS,
           );
         }
         record.attempts++;

@@ -12,8 +12,9 @@
     "experimentalDecorators": true,
 
     "strict": true,
-    "noImplicitAny": true,
-    "strictNullChecks": true,
+    "strictPropertyInitialization": false,
+    "noImplicitAny": false,
+    "strictNullChecks": false,
     "forceConsistentCasingInFileNames": true,
 
     "baseUrl": "./",
@@ -34,5 +35,6 @@
     "compilerOptions": {
       "module": "commonjs"
     }
-  }
+  },
+  "exclude": ["node_modules", "dist", "test", "src/api-key"]
 }

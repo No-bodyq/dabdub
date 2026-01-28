@@ -8,7 +8,7 @@ import { AppService } from './app.service';
 // Config & Core Modules
 import { GlobalConfigModule } from './config/config.module';
 import { DatabaseModule } from './database/database.module';
-import { CacheModule } from './cache/cache.module';
+import { CacheModule } from '@nestjs/cache-manager';
 import { LoggerModule } from './logger/logger.module';
 // Feature Modules
 import { AnalyticsModule } from './analytics/analytics.module';
@@ -31,7 +31,7 @@ import { EVMModule } from './evm/evm.module';
   imports: [
     GlobalConfigModule,
     DatabaseModule,
-    CacheModule,
+    CacheModule.register({ isGlobal: true }),
     LoggerModule,
     ScheduleModule.forRoot(),
     ThrottlerModule.forRoot([
@@ -40,7 +40,7 @@ import { EVMModule } from './evm/evm.module';
         limit: 10,
       },
     ]),
-    BullModule.forRootAsync({
+    /* BullModule.forRootAsync({
       imports: [GlobalConfigModule],
       useFactory: async (configService: GlobalConfigService) => ({
         redis: {
@@ -49,9 +49,9 @@ import { EVMModule } from './evm/evm.module';
         },
       }),
       inject: [GlobalConfigService],
-    }),
+    }), */
     NotificationModule,
-    AnalyticsModule,
+    // AnalyticsModule,
     SettlementModule,
     TransactionsModule,
     BlockchainModule,

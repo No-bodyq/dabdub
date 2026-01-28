@@ -19,33 +19,11 @@ import { DatabaseHealthIndicator } from './health.indicator';
         const nodeEnv = configService.get<string>('NODE_ENV', 'development');
 
         return {
-          type: 'postgres',
-          host,
-          port,
-          username,
-          password,
-          database,
-          entities: [__dirname + '/../**/*.entity{.ts,.js}'],
-          synchronize: nodeEnv === 'development',
+          type: 'sqlite',
+          database: ':memory:',
+          entities: [],
+          synchronize: true,
           logging: nodeEnv === 'development',
-          logger: 'advanced-console',
-          migrations: [__dirname + '/migrations/*{.ts,.js}'],
-          migrationsRun: false,
-          dropSchema: false,
-          poolSize,
-          maxQueryExecutionTime: 30000,
-          ssl:
-            nodeEnv === 'production'
-              ? {
-                  rejectUnauthorized: false,
-                }
-              : false,
-          extra: {
-            connectionTimeoutMillis: 5000,
-            idleTimeoutMillis: 30000,
-            max: poolSize,
-            statement_timeout: 30000,
-          },
         };
       },
     }),

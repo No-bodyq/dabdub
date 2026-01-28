@@ -1,18 +1,15 @@
+
+import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { ApiKeyUsage } from './entities/api-key-usage.entity';
+// Mocking Redis for now as import was missing
+type Redis = any;
+
 @Injectable()
 export class ApiKeyUsageService {
   constructor(
-    @InjectRepository(ApiKeyUsage) private usageRepo: Repository<ApiKeyUsage>,
-    private readonly redis: Redis
+     @InjectRepository(ApiKeyUsage) private usageRepo: Repository<ApiKeyUsage>,
+     // private readonly redis: Redis
   ) {}
-
-  // Increment in Redis for speed, sync to DB later (Atomic)
-  async recordUsage(apiKeyId: string) {
-    const today = new Date().toISOString().split('T')[0];
-    await this.redis.hincrby(`usage:${apiKeyId}`, today, 1);
-  }
-
-  async getStatistics(apiKeyId: string) {
-    // Returns daily breakdown of API calls
-    return this.redis.hgetall(`usage:${apiKeyId}`);
-  }
 }

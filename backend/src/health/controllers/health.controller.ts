@@ -1,6 +1,9 @@
-import { Controller, Get, HttpStatus } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { Controller, Get, HttpStatus, UseGuards, UseInterceptors } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { HealthCheck, HealthCheckResult } from '@nestjs/terminus';
+import { CacheInterceptor, CacheTTL } from '@nestjs/cache-manager';
 import { HealthService } from '../services/health.service';
+import { JwtGuard } from '../../auth/guards/jwt.guard';
 
 @ApiTags('Health')
 @Controller('health')
@@ -8,45 +11,68 @@ export class HealthController {
   constructor(private readonly healthService: HealthService) {}
 
   @Get()
+  @HealthCheck()
   @ApiOperation({
-    summary: 'Health check endpoint',
-    description: 'Returns the current health status of the application',
+    summary: 'Basic health check',
+    description: 'Returns the health status of the application and database',
   })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Application is healthy',
-    schema: {
-      example: {
-        status: 'ok',
-        timestamp: '2024-01-20T10:30:00Z',
-        uptime: 3600,
-        version: '2.0.0',
-        checks: {
-          database: 'healthy',
-          cache: 'healthy',
-          external_services: 'healthy',
-        },
-      },
-    },
   })
   @ApiResponse({
     status: HttpStatus.SERVICE_UNAVAILABLE,
     description: 'Application is not healthy',
   })
-  async check() {
+  async check(): Promise<HealthCheckResult> {
     return this.healthService.check();
   }
 
-  @Get('deep')
+  @Get('ready')
+  @HealthCheck()
   @ApiOperation({
-    summary: 'Deep health check',
-    description: 'Performs comprehensive health checks including dependencies',
+    summary: 'Readiness probe',
+    description: 'Checks if the application is ready to handle requests (DB, dependencies)',
   })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Detailed health information',
+  async checkReadiness(): Promise<HealthCheckResult> {
+    return this.healthService.checkReadiness();
+  }
+
+  @Get('live')
+  @HealthCheck()
+  @ApiOperation({
+    summary: 'Liveness probe',
+    description: 'Checks if the application is alive/responsive',
   })
-  async deepCheck() {
-    return this.healthService.deepCheck();
+  async checkLiveness(): Promise<HealthCheckResult> {
+    return this.healthService.checkLiveness();
+  }
+
+  @Get('detailed')
+  @UseGuards(JwtGuard)
+  @ApiBearerAuth()
+  @UseInterceptors(CacheInterceptor)
+  @CacheTTL(5000) // 5 seconds cache
+  @HealthCheck()
+  @ApiOperation({
+    summary: 'Detailed health check',
+    description: 'Performs comprehensive system checks (Auth required, Cached 5s)',
+  })
+  async checkDetailed(): Promise<HealthCheckResult> {
+    return this.healthService.checkDetailed();
+  }
+
+  @Get('version')
+  @ApiOperation({
+    summary: 'Version information',
+    description: 'Returns the current version of the application',
+  })
+  getVersion() {
+    return {
+      version: process.env.npm_package_version || '0.0.1',
+      environment: process.env.NODE_ENV || 'development',
+      gitCommit: process.env.GIT_COMMIT || 'unknown',
+    };
   }
 }
+
