@@ -21,6 +21,7 @@ import { BlockchainModule } from './blockchain/blockchain.module';
 import { AuthModule } from './auth/auth.module';
 import { PublicModule } from './public/public.module';
 import { PaymentRequestModule } from './payment-request/payment-request.module';
+import { MerchantModule } from './merchant/merchant.module';
 // Middleware
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
 import { EVMModule } from './evm/evm.module';
@@ -61,6 +62,7 @@ import { MonitoringModule } from './monitoring/monitoring.module';
     PublicModule,
     EVMModule,
     PaymentRequestModule,
+    MerchantModule,
     MonitoringModule,
   ],
   controllers: [AppController],
