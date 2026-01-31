@@ -25,6 +25,7 @@ import { MerchantModule } from './merchant/merchant.module';
 // Middleware
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
 import { EVMModule } from './evm/evm.module';
+import { StellarModule } from './stellar/stellar.module';
 import { MonitoringModule } from './monitoring/monitoring.module';
 import { MerchantModule } from './merchant/merchant.module';
 import { ExchangeRateModule } from './exchange-rate/exchange-rate.module';
@@ -58,6 +59,7 @@ import { ExchangeRateModule } from './exchange-rate/exchange-rate.module';
     TransactionsModule,
     BlockchainModule,
     AuthModule,
+    StellarModule,
     HealthModule,
     WebhooksModule,
     PublicModule,
