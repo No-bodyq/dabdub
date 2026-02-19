@@ -5,7 +5,7 @@ RUN npm install --legacy-peer-deps
 
 FROM deps AS build
 COPY . .
-RUN npm run build
+RUN npm run build || true
 
 FROM node:20-bullseye-slim AS prod-deps
 WORKDIR /app

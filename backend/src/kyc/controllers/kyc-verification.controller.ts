@@ -210,7 +210,7 @@ export class KycVerificationController {
   async uploadDocument(
     @Request() req: any,
     @Param('id') verificationId: string,
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile() file: any,
     @Body() dto: DocumentUploadDto,
   ): Promise<KycDocumentResponseDto> {
     if (!file) {

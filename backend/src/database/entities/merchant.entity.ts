@@ -5,6 +5,7 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   OneToMany,
+  Index,
 } from 'typeorm';
 import { Exclude } from 'class-transformer';
 import { Settlement } from '../../settlement/entities/settlement.entity';
@@ -18,6 +19,8 @@ export enum MerchantStatus {
   ACTIVE = 'active',
   INACTIVE = 'inactive',
   SUSPENDED = 'suspended',
+  PENDING = 'pending',
+  CLOSED = 'closed',
 }
 
 export enum KycStatus {
@@ -25,6 +28,13 @@ export enum KycStatus {
   APPROVED = 'approved',
   REJECTED = 'rejected',
   NOT_SUBMITTED = 'not_submitted',
+  IN_REVIEW = 'in_review',
+}
+
+export enum BankAccountStatus {
+  PENDING = 'pending',
+  VERIFIED = 'verified',
+  REJECTED = 'rejected',
 }
 
 @Entity('merchants')
@@ -85,6 +95,27 @@ export class Merchant {
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt!: Date;
 
+  @Column({ name: 'closed_at', type: 'timestamp', nullable: true })
+  closedAt?: Date;
+
+  @Column({ name: 'kyc_verified_at', type: 'timestamp', nullable: true })
+  kycVerifiedAt?: Date;
+
+  @Column({ name: 'bank_verified_at', type: 'timestamp', nullable: true })
+  bankVerifiedAt?: Date;
+
+  @Column({ name: 'email_verification_token', type: 'varchar', nullable: true })
+  emailVerificationToken?: string;
+
+  @Column({ name: 'bank_account_status', type: 'varchar', default: 'pending' })
+  bankAccountStatus!: string;
+
+  @Column({ name: 'api_quota_used', type: 'integer', default: 0 })
+  apiQuotaUsed!: number;
+
+  @Column({ name: 'api_quota_reset_at', type: 'timestamp', nullable: true })
+  apiQuotaResetAt?: Date;
+
   // Relationships
   @OneToMany(() => Settlement, (settlement) => settlement.merchant)
   settlements!: Settlement[];
@@ -97,6 +128,9 @@ export class Merchant {
     (webhookConfig) => webhookConfig.merchant,
   )
   webhookConfigurations!: WebhookConfigurationEntity[];
+
+  @OneToMany(() => require('../../kyc/entities/kyc-verification.entity').KycVerification, (kycVerification: any) => kycVerification.merchant)
+  kycVerifications!: any[];
 }
 
 /**

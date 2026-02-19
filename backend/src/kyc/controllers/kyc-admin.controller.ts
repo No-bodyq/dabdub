@@ -15,7 +15,7 @@ import {
   ApiResponse,
   ApiBearerAuth,
 } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../../auth/guards/jwt.guard';
+import { JwtGuard } from '../../auth/guards/jwt.guard';
 import { AdminGuard } from '../../auth/guards/admin.guard';
 import { KycVerificationService } from '../services/kyc-verification.service';
 import { KycAuditService } from '../services/kyc-audit.service';
@@ -28,7 +28,7 @@ import { KycAuditLog } from '../entities/kyc-audit-log.entity';
 
 @ApiTags('KYC Admin')
 @Controller('api/v1/admin/kyc')
-@UseGuards(JwtAuthGuard, AdminGuard)
+@UseGuards(JwtGuard, AdminGuard)
 @ApiBearerAuth()
 export class KycAdminController {
   constructor(

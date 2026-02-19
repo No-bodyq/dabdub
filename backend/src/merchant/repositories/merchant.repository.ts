@@ -134,7 +134,8 @@ export class MerchantRepository {
         // Apply sorting
         const validSortFields = ['createdAt', 'name', 'businessName', 'status', 'updatedAt'];
         const sortField = validSortFields.includes(sortBy) ? sortBy : 'createdAt';
-        queryBuilder.orderBy(`merchant.${sortField}`, sortOrder);
+        const order: 'ASC' | 'DESC' = (sortOrder === 'ASC' || sortOrder === 'DESC') ? sortOrder : 'DESC';
+        queryBuilder.orderBy(`merchant.${sortField}`, order);
 
         // Apply pagination
         const skip = (page - 1) * limit;

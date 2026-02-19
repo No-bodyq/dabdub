@@ -35,7 +35,8 @@ export class DocumentProcessingProcessor {
 
       this.logger.log(`Document processing completed for ${documentId}`);
     } catch (error) {
-      this.logger.error(`Document processing failed for ${documentId}: ${error.message}`, error.stack);
+      const err = error as Error;
+      this.logger.error(`Document processing failed for ${documentId}: ${err.message}`, err.stack);
       throw error;
     }
   }

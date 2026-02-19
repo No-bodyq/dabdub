@@ -8,8 +8,8 @@ import {
   ManyToOne,
   JoinColumn,
 } from 'typeorm';
-import { TransactionStatus, TransactionType } from '/home/afolarinwa-soleye/dabdub/backend/src/transactions/transactions.enums';
-import { PaymentRequest } from '/home/afolarinwa-soleye/dabdub/backend/src/database/entities/payment-request.entity';
+import { TransactionStatus, TransactionType } from '../transactions.enums';
+import { PaymentRequest } from '../../database/entities/payment-request.entity';
 
 @Entity('transactions')
 @Index(['txHash'])
@@ -57,7 +57,13 @@ export class Transaction {
 
   // --- AMOUNT TRACKING ---
   @Column({ name: 'crypto_amount', type: 'decimal', precision: 36, scale: 18 })
-  cryptoAmount!: string; 
+  cryptoAmount!: string;
+
+  @Column({ name: 'amount', type: 'decimal', precision: 36, scale: 18, nullable: true })
+  amount?: string;
+
+  @Column({ name: 'currency', type: 'varchar', length: 10, default: 'USD' })
+  currency!: string;
 
   @Column({ name: 'usd_value', type: 'decimal', precision: 18, scale: 2, nullable: true })
   usdValue!: number;

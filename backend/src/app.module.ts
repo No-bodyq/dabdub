@@ -30,14 +30,14 @@ import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
 import { EVMModule } from './evm/evm.module';
 import { StellarModule } from './stellar/stellar.module';
 import { MonitoringModule } from './monitoring/monitoring.module';
-import { MerchantModule } from './merchant/merchant.module';
 import { ExchangeRateModule } from './exchange-rate/exchange-rate.module';
 
-import { SentryModule } from '@sentry/nestjs/dist';
+// TODO: Enable Sentry when @sentry/nestjs module is compatible
+// import { SentryModule } from '@sentry/nestjs';
 
 @Module({
   imports: [
-    SentryModule.forRoot(),
+    // SentryModule.forRoot(), // TODO: Enable when compatible
     GlobalConfigModule,
     DatabaseModule,
     CacheModule.register({ isGlobal: true }),

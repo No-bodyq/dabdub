@@ -170,9 +170,9 @@ export class KycVerificationService {
       where: { kycVerificationId: verificationId },
     });
 
-    const uploadedTypes = uploadedDocuments.map(doc => doc.documentType);
+    const uploadedTypes = uploadedDocuments.map(doc => doc.documentType as string);
     const missingDocuments = requiredDocuments.filter(
-      type => !uploadedTypes.includes(type),
+      type => !uploadedTypes.includes(type as string),
     );
 
     if (missingDocuments.length > 0) {
