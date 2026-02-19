@@ -18,14 +18,15 @@ jobs:
   build-image:
     runs-on: ubuntu-latest
     outputs:
-      image: ${{ steps.image.outputs.image }}
+      image: ${{ env.IMAGE_TAG_BASE }}:${{ github.sha }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set image output
-        id: image
-        run: echo "image=$(echo ghcr.io/${{ github.repository }}-backend:${{ github.sha }} | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+      - name: Convert image name to lowercase
+        run: |
+          IMAGE_BASE=$(echo ghcr.io/${{ github.repository }}-backend | tr '[:upper:]' '[:lower:]')
+          echo "IMAGE_TAG_BASE=${IMAGE_BASE}" >> $GITHUB_ENV
 
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -44,8 +45,8 @@ jobs:
           file: backend/Dockerfile
           push: true
           tags: |
-            ${{ steps.image.outputs.image }}
-            $(echo ghcr.io/${{ github.repository }}-backend:latest | tr '[:upper:]' '[:lower:]')
+            ${{ env.IMAGE_TAG_BASE }}:${{ github.sha }}
+            ${{ env.IMAGE_TAG_BASE }}:latest
 
   deploy-staging:
     runs-on: ubuntu-latest
