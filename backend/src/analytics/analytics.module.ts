@@ -16,6 +16,7 @@ import { Merchant } from '../database/entities/merchant.entity';
 import { PaymentRequest } from '../database/entities/payment-request.entity';
 import { Transaction } from '../transactions/entities/transaction.entity';
 import { AuthModule } from '../auth/auth.module';
+import { VolumeAnalyticsService } from './volume-analytics.service';
 
 @Module({
   imports: [
@@ -38,7 +39,8 @@ import { AuthModule } from '../auth/auth.module';
     RevenueExportService,
     RevenueExportProcessor,
     SystemAnalyticsService,
+    VolumeAnalyticsService,
   ],
-  exports: [AnalyticsService, ReportService, RevenueOverviewService],
+  exports: [AnalyticsService, ReportService, RevenueOverviewService,  VolumeAnalyticsService],
 })
 export class AnalyticsModule {}

@@ -64,6 +64,7 @@ export class AnalyticsController {
     private readonly revenueOverviewService: RevenueOverviewService,
     private readonly revenueExportService: RevenueExportService,
     private readonly systemAnalyticsService: SystemAnalyticsService,
+    private readonly volumeAnalyticsService: VolumeAnalyticsService,
   ) {}
 
   @Get('dashboard')
@@ -170,8 +171,21 @@ export class AnalyticsController {
       new Date(endDate),
       interval,
     );
-  }
-
+  } @Get('volume')
+@UseGuards(JwtGuard, RequirePermissionGuard)
+@RequirePermission('analytics:read')
+@ApiOperation({
+  summary: 'Transaction volume time-series',
+  description:
+    'Returns volume analytics with optional groupBy breakdown. Supports hour/day/week/month granularity with zero-filled gaps.',
+})
+@ApiResponse({ status: 200, type: VolumeAnalyticsResponseDto })
+@ApiResponse({ status: 400, description: 'Date range exceeds limit or endDate is in the future' })
+async getVolumeAnalytics(
+  @Query() query: VolumeAnalyticsQueryDto,
+): Promise<VolumeAnalyticsResponseDto> {
+  return this.volumeAnalyticsService.getVolumeAnalytics(query);
+}
   @Get('system')
   @UseGuards(JwtGuard, RequirePermissionGuard)
   @RequirePermission('analytics:read')
