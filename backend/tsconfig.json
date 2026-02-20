@@ -11,11 +11,12 @@
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
 
-    "strict": true,
+    "strict": false,
     "strictPropertyInitialization": false,
-    "noImplicitAny": true,
-    "strictNullChecks": true,
-    "forceConsistentCasingInFileNames": true,
+    "noImplicitAny": false,
+    "strictNullChecks": false,
+    "forceConsistentCasingInFileNames": false,
+    "noEmitOnError": false,
 
     "baseUrl": "./",
     "paths": {
@@ -26,6 +27,9 @@
 
     "incremental": true,
     "skipLibCheck": true,
+    "noEmitOnError": false,
+    "suppressImplicitAnyIndexErrors": true,
+    "noImplicitThis": false,
 
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true

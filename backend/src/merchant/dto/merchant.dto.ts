@@ -129,3 +129,58 @@ export class MerchantResponseDto {
   @ApiProperty()
   createdAt: Date;
 }
+
+export class SearchMerchantsDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  email?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  status?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  kycStatus?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  businessType?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  country?: string;
+
+  @ApiPropertyOptional({ type: Number, default: 1 })
+  @IsOptional()
+  page?: number;
+
+  @ApiPropertyOptional({ type: Number, default: 10 })
+  @IsOptional()
+  limit?: number;
+
+  @ApiPropertyOptional({ default: 'createdAt' })
+  @IsOptional()
+  @IsString()
+  sortBy?: string;
+
+  @ApiPropertyOptional({ default: 'DESC' })
+  @IsOptional()
+  @IsString()
+  sortOrder?: string;
+}

@@ -3,10 +3,7 @@ import { Logger } from '@nestjs/common';
 import { Job } from 'bull';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import {
-  KycDocument,
-  DocumentStatus,
-} from '../entities/kyc-document.entity';
+import { KycDocument, DocumentStatus } from '../entities/kyc-document.entity';
 import { KycDocumentService } from '../services/kyc-document.service';
 import { VerificationProviderService } from '../services/verification-provider.service';
 import { KycAuditService } from '../services/kyc-audit.service';
@@ -27,7 +24,7 @@ export class DocumentProcessingProcessor {
   @Process('process-document')
   async processDocument(job: Job<{ documentId: string }>): Promise<void> {
     const { documentId } = job.data;
-    
+
     try {
       this.logger.log(`Starting document processing for ${documentId}`);
 
@@ -35,7 +32,11 @@ export class DocumentProcessingProcessor {
 
       this.logger.log(`Document processing completed for ${documentId}`);
     } catch (error) {
-      this.logger.error(`Document processing failed for ${documentId}: ${error.message}`, error.stack);
+      const err = error as Error;
+      this.logger.error(
+        `Document processing failed for ${documentId}: ${err.message}`,
+        err.stack,
+      );
       throw error;
     }
   }
@@ -43,7 +44,7 @@ export class DocumentProcessingProcessor {
   @Process('verify-document')
   async verifyDocument(job: Job<{ documentId: string }>): Promise<void> {
     const { documentId } = job.data;
-    
+
     try {
       this.logger.log(`Starting document verification for ${documentId}`);
 
@@ -60,7 +61,8 @@ export class DocumentProcessingProcessor {
       }
 
       // Perform document-specific verification
-      const verificationResult = await this.performDocumentVerification(document);
+      const verificationResult =
+        await this.performDocumentVerification(document);
 
       // Update document with verification results
       document.verificationProvider = verificationResult.provider;
@@ -82,8 +84,8 @@ export class DocumentProcessingProcessor {
       // Create audit log
       await this.auditService.logAction(
         document.kycVerificationId,
-        document.status === DocumentStatus.VERIFIED 
-          ? AuditAction.DOCUMENT_VERIFIED 
+        document.status === DocumentStatus.VERIFIED
+          ? AuditAction.DOCUMENT_VERIFIED
           : AuditAction.DOCUMENT_REJECTED,
         `Document verification completed: ${document.documentType}`,
         null,
@@ -97,10 +99,15 @@ export class DocumentProcessingProcessor {
         },
       );
 
-      this.logger.log(`Document verification completed for ${documentId}: ${document.status}`);
+      this.logger.log(
+        `Document verification completed for ${documentId}: ${document.status}`,
+      );
     } catch (error) {
-      this.logger.error(`Document verification failed for ${documentId}: ${error.message}`, error.stack);
-      
+      this.logger.error(
+        `Document verification failed for ${documentId}: ${error.message}`,
+        error.stack,
+      );
+
       // Update document status to rejected
       try {
         await this.documentRepository.update(documentId, {
@@ -125,7 +132,9 @@ export class DocumentProcessingProcessor {
           );
         }
       } catch (updateError) {
-        this.logger.error(`Failed to update document status: ${updateError.message}`);
+        this.logger.error(
+          `Failed to update document status: ${updateError.message}`,
+        );
       }
 
       throw error;
@@ -140,7 +149,9 @@ export class DocumentProcessingProcessor {
       const expiredDocuments = await this.documentRepository
         .createQueryBuilder('document')
         .where('document.expiryDate <= :now', { now: new Date() })
-        .andWhere('document.status = :status', { status: DocumentStatus.VERIFIED })
+        .andWhere('document.status = :status', {
+          status: DocumentStatus.VERIFIED,
+        })
         .getMany();
 
       for (const document of expiredDocuments) {
@@ -161,7 +172,10 @@ export class DocumentProcessingProcessor {
 
       this.logger.log(`Processed ${expiredDocuments.length} expired documents`);
     } catch (error) {
-      this.logger.error(`Document expiry check failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Document expiry check failed: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -179,7 +193,10 @@ export class DocumentProcessingProcessor {
       // For now, we'll simulate the verification process
 
       // Basic checks
-      if (!document.extractedData || Object.keys(document.extractedData).length === 0) {
+      if (
+        !document.extractedData ||
+        Object.keys(document.extractedData).length === 0
+      ) {
         return {
           provider: 'internal',
           reference: `internal_${Date.now()}`,
@@ -207,7 +224,10 @@ export class DocumentProcessingProcessor {
         return {
           provider: 'internal',
           reference: `internal_${Date.now()}`,
-          details: { reason: 'Low OCR confidence', confidence: document.ocrConfidence },
+          details: {
+            reason: 'Low OCR confidence',
+            confidence: document.ocrConfidence,
+          },
           isAuthentic: false,
           rejectionReason: 'Document text could not be read reliably',
           rejectionCode: 'LOW_OCR_CONFIDENCE',
@@ -246,7 +266,8 @@ export class DocumentProcessingProcessor {
 
       // Add some randomness for testing
       const randomFactor = Math.random();
-      if (randomFactor < 0.05) { // 5% chance of rejection for testing
+      if (randomFactor < 0.05) {
+        // 5% chance of rejection for testing
         return {
           ...mockVerificationResult,
           isAuthentic: false,
@@ -257,7 +278,9 @@ export class DocumentProcessingProcessor {
 
       return mockVerificationResult;
     } catch (error) {
-      this.logger.error(`Document verification service error: ${error.message}`);
+      this.logger.error(
+        `Document verification service error: ${error.message}`,
+      );
       return {
         provider: 'internal',
         reference: `error_${Date.now()}`,

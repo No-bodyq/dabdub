@@ -70,6 +70,15 @@ export class WebhookConfigurationEntity {
   @Column({ name: 'consecutive_failures', type: 'int', default: 0 })
   consecutiveFailures!: number;
 
+  @Column({ name: 'is_active', type: 'boolean', default: true })
+  isActive!: boolean;
+
+  @Column({ name: 'failure_count', type: 'int', default: 0 })
+  failureCount!: number;
+
+  @Column({ name: 'max_failure_count', type: 'int', default: 5 })
+  maxFailureCount!: number;
+
   @Column({ name: 'max_consecutive_failures', type: 'int', default: 5 })
   maxConsecutiveFailures!: number;
 

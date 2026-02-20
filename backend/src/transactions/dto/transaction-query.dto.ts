@@ -9,7 +9,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { TransactionStatus } from '../entities/transaction.entity';
+import { TransactionStatus } from '../transactions.enums';
 
 export class TransactionQueryDto {
   @ApiPropertyOptional({ description: 'Filter by network' })

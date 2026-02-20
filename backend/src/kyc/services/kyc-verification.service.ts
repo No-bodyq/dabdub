@@ -67,7 +67,8 @@ export class KycVerificationService {
       submittedAt: new Date(),
     });
 
-    const savedVerification = await this.kycVerificationRepository.save(verification);
+    const savedVerification =
+      await this.kycVerificationRepository.save(verification);
 
     // Create audit log
     await this.auditService.logAction(
@@ -119,7 +120,10 @@ export class KycVerificationService {
     merchantId?: string,
     userId?: string,
   ): Promise<KycVerificationResponseDto> {
-    const verification = await this.findVerificationById(verificationId, merchantId);
+    const verification = await this.findVerificationById(
+      verificationId,
+      merchantId,
+    );
 
     // Only allow updates if verification is in certain statuses
     const allowedStatuses = [
@@ -135,7 +139,8 @@ export class KycVerificationService {
 
     const oldValues = { ...verification };
     Object.assign(verification, dto);
-    const updatedVerification = await this.kycVerificationRepository.save(verification);
+    const updatedVerification =
+      await this.kycVerificationRepository.save(verification);
 
     // Create audit log
     await this.auditService.logAction(
@@ -156,7 +161,10 @@ export class KycVerificationService {
     merchantId?: string,
     userId?: string,
   ): Promise<KycVerificationResponseDto> {
-    const verification = await this.findVerificationById(verificationId, merchantId);
+    const verification = await this.findVerificationById(
+      verificationId,
+      merchantId,
+    );
 
     if (verification.status !== KycVerificationStatus.DOCUMENTS_UPLOADED) {
       throw new BadRequestException(
@@ -165,14 +173,18 @@ export class KycVerificationService {
     }
 
     // Check if required documents are uploaded
-    const requiredDocuments = await this.getRequiredDocuments(verification.verificationType);
+    const requiredDocuments = await this.getRequiredDocuments(
+      verification.verificationType,
+    );
     const uploadedDocuments = await this.kycDocumentRepository.find({
       where: { kycVerificationId: verificationId },
     });
 
-    const uploadedTypes = uploadedDocuments.map(doc => doc.documentType);
+    const uploadedTypes = uploadedDocuments.map(
+      (doc) => doc.documentType as string,
+    );
     const missingDocuments = requiredDocuments.filter(
-      type => !uploadedTypes.includes(type),
+      (type) => !uploadedTypes.includes(type as string),
     );
 
     if (missingDocuments.length > 0) {
@@ -183,7 +195,8 @@ export class KycVerificationService {
 
     verification.status = KycVerificationStatus.PROCESSING;
     verification.submittedAt = new Date();
-    const updatedVerification = await this.kycVerificationRepository.save(verification);
+    const updatedVerification =
+      await this.kycVerificationRepository.save(verification);
 
     // Create audit log
     await this.auditService.logAction(
@@ -243,19 +256,25 @@ export class KycVerificationService {
     const now = new Date();
     if (dto.status === KycVerificationStatus.APPROVED) {
       verification.approvedAt = now;
-      verification.expiresAt = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000); // 1 year
-      verification.nextReviewAt = new Date(now.getTime() + 330 * 24 * 60 * 60 * 1000); // 11 months
+      verification.expiresAt = new Date(
+        now.getTime() + 365 * 24 * 60 * 60 * 1000,
+      ); // 1 year
+      verification.nextReviewAt = new Date(
+        now.getTime() + 330 * 24 * 60 * 60 * 1000,
+      ); // 11 months
     } else if (dto.status === KycVerificationStatus.REJECTED) {
       verification.rejectedAt = now;
     }
 
     verification.processedAt = now;
-    const updatedVerification = await this.kycVerificationRepository.save(verification);
+    const updatedVerification =
+      await this.kycVerificationRepository.save(verification);
 
     // Create audit log
-    const action = dto.status === KycVerificationStatus.APPROVED
-      ? AuditAction.VERIFICATION_APPROVED
-      : AuditAction.VERIFICATION_REJECTED;
+    const action =
+      dto.status === KycVerificationStatus.APPROVED
+        ? AuditAction.VERIFICATION_APPROVED
+        : AuditAction.VERIFICATION_REJECTED;
 
     await this.auditService.logAction(
       verification.id,
@@ -268,9 +287,10 @@ export class KycVerificationService {
     );
 
     // Send notification
-    const notificationMessage = dto.status === KycVerificationStatus.APPROVED
-      ? 'Your KYC verification has been approved!'
-      : `Your KYC verification has been rejected. Reason: ${dto.rejectionReason}`;
+    const notificationMessage =
+      dto.status === KycVerificationStatus.APPROVED
+        ? 'Your KYC verification has been approved!'
+        : `Your KYC verification has been rejected. Reason: ${dto.rejectionReason}`;
 
     await this.notificationService.sendNotification(
       verification.merchantId,
@@ -285,7 +305,12 @@ export class KycVerificationService {
 
   async getVerifications(
     query: KycStatusQueryDto,
-  ): Promise<{ data: KycVerificationResponseDto[]; total: number; page: number; limit: number }> {
+  ): Promise<{
+    data: KycVerificationResponseDto[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
     const { status, riskLevel, merchantId, page = 1, limit = 20 } = query;
 
     const where: FindOptionsWhere<KycVerification> = {};
@@ -293,23 +318,26 @@ export class KycVerificationService {
     if (riskLevel) where.riskLevel = riskLevel;
     if (merchantId) where.merchantId = merchantId;
 
-    const [verifications, total] = await this.kycVerificationRepository.findAndCount({
-      where,
-      relations: ['documents'],
-      order: { createdAt: 'DESC' },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
+    const [verifications, total] =
+      await this.kycVerificationRepository.findAndCount({
+        where,
+        relations: ['documents'],
+        order: { createdAt: 'DESC' },
+        skip: (page - 1) * limit,
+        take: limit,
+      });
 
     return {
-      data: verifications.map(v => this.mapToResponseDto(v)),
+      data: verifications.map((v) => this.mapToResponseDto(v)),
       total,
       page,
       limit,
     };
   }
 
-  async getMerchantVerification(merchantId: string): Promise<KycVerificationResponseDto | null> {
+  async getMerchantVerification(
+    merchantId: string,
+  ): Promise<KycVerificationResponseDto | null> {
     const verification = await this.kycVerificationRepository.findOne({
       where: { merchantId },
       relations: ['documents'],
@@ -349,7 +377,9 @@ export class KycVerificationService {
       );
     }
 
-    this.logger.log(`Processed ${expiredVerifications.length} expired verifications`);
+    this.logger.log(
+      `Processed ${expiredVerifications.length} expired verifications`,
+    );
   }
 
   private async findVerificationById(
@@ -361,7 +391,9 @@ export class KycVerificationService {
       where.merchantId = merchantId;
     }
 
-    const verification = await this.kycVerificationRepository.findOne({ where });
+    const verification = await this.kycVerificationRepository.findOne({
+      where,
+    });
 
     if (!verification) {
       throw new NotFoundException('KYC verification not found');
@@ -370,18 +402,31 @@ export class KycVerificationService {
     return verification;
   }
 
-  private async getRequiredDocuments(verificationType: string): Promise<string[]> {
+  private async getRequiredDocuments(
+    verificationType: string,
+  ): Promise<string[]> {
     // Define required documents based on verification type
     const requirements = {
       individual: ['passport', 'proof_of_address'],
-      business: ['business_registration', 'articles_of_incorporation', 'proof_of_address'],
-      enhanced: ['passport', 'proof_of_address', 'business_registration', 'bank_statement'],
+      business: [
+        'business_registration',
+        'articles_of_incorporation',
+        'proof_of_address',
+      ],
+      enhanced: [
+        'passport',
+        'proof_of_address',
+        'business_registration',
+        'bank_statement',
+      ],
     };
 
     return requirements[verificationType] || [];
   }
 
-  private mapToResponseDto(verification: KycVerification): KycVerificationResponseDto {
+  private mapToResponseDto(
+    verification: KycVerification,
+  ): KycVerificationResponseDto {
     return {
       id: verification.id,
       merchantId: verification.merchantId,
@@ -404,7 +449,7 @@ export class KycVerificationService {
       updatedAt: verification.updatedAt,
       reviewNotes: verification.reviewNotes,
       rejectionReason: verification.rejectionReason,
-      documents: verification.documents?.map(doc => ({
+      documents: verification.documents?.map((doc) => ({
         id: doc.id,
         documentType: doc.documentType,
         status: doc.status,

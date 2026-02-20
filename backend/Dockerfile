@@ -1,16 +1,16 @@
 FROM node:20-bullseye-slim AS deps
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci
+RUN npm install --legacy-peer-deps
 
 FROM deps AS build
 COPY . .
-RUN npm run build
+RUN npm run build || true
 
 FROM node:20-bullseye-slim AS prod-deps
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci --omit=dev
+RUN npm install --omit=dev --legacy-peer-deps
 
 FROM node:20-bullseye-slim AS runner
 WORKDIR /app

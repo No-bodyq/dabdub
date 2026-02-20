@@ -15,7 +15,7 @@ import {
   ApiResponse,
   ApiBearerAuth,
 } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../../auth/guards/jwt.guard';
+import { JwtGuard } from '../../auth/guards/jwt.guard';
 import { AdminGuard } from '../../auth/guards/admin.guard';
 import { KycVerificationService } from '../services/kyc-verification.service';
 import { KycAuditService } from '../services/kyc-audit.service';
@@ -28,7 +28,7 @@ import { KycAuditLog } from '../entities/kyc-audit-log.entity';
 
 @ApiTags('KYC Admin')
 @Controller('api/v1/admin/kyc')
-@UseGuards(JwtAuthGuard, AdminGuard)
+@UseGuards(JwtGuard, AdminGuard)
 @ApiBearerAuth()
 export class KycAdminController {
   constructor(
@@ -54,9 +54,7 @@ export class KycAdminController {
       },
     },
   })
-  async getVerifications(
-    @Query() query: KycStatusQueryDto,
-  ): Promise<{
+  async getVerifications(@Query() query: KycStatusQueryDto): Promise<{
     data: KycVerificationResponseDto[];
     total: number;
     page: number;
@@ -135,8 +133,13 @@ export class KycAdminController {
   ): Promise<KycAuditLog[]> {
     const start = new Date(startDate);
     const end = new Date(endDate);
-    
-    return this.kycAuditService.getComplianceAuditLogs(start, end, limit, offset);
+
+    return this.kycAuditService.getComplianceAuditLogs(
+      start,
+      end,
+      limit,
+      offset,
+    );
   }
 
   @Get('statistics')
@@ -240,7 +243,7 @@ export class KycAdminController {
     // This would generate a comprehensive compliance report
     // For now, returning a placeholder structure
     const reportId = `compliance_${Date.now()}`;
-    
+
     return {
       reportId,
       generatedAt: new Date().toISOString(),
