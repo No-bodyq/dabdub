@@ -27,6 +27,7 @@ import { PaymentRequestModule } from './payment-request/payment-request.module';
 import { MerchantModule } from './merchant/merchant.module';
 // Middleware
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
+import { AdminRateLimitMiddleware } from './auth/middleware/admin-rate-limit.middleware';
 import { EVMModule } from './evm/evm.module';
 import { StellarModule } from './stellar/stellar.module';
 import { MonitoringModule } from './monitoring/monitoring.module';
@@ -98,5 +99,6 @@ import { ExchangeRateModule } from './exchange-rate/exchange-rate.module';
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
     consumer.apply(RequestIdMiddleware).forRoutes('*');
+    consumer.apply(AdminRateLimitMiddleware).forRoutes('admin/*');
   }
 }
