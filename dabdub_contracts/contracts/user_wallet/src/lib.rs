@@ -1,6 +1,14 @@
 #![no_std]
 
-use soroban_sdk::{contract, contractevent, contractimpl, contracttype, token, Address, Env};
+use soroban_sdk::{
+    contract, contractclient, contractevent, contractimpl, contracttype, token, Address, Env,
+};
+
+#[contractclient(name = "CheeseVaultClient")]
+pub trait CheeseVaultTrait {
+    fn get_fee_amount(env: Env) -> i128;
+    fn get_claim_period(env: Env) -> (bool, u64);
+}
 
 #[contracttype]
 #[derive(Clone)]
@@ -11,7 +19,6 @@ pub enum DataKey {
     UsdcToken,
 }
 
-// Events
 #[contractevent(topics = ["WALLET", "withdraw"])]
 struct WithdrawalEvent {
     recipient: Address,
@@ -29,12 +36,19 @@ struct EmergencyWithdrawalEvent {
     amount: i128,
 }
 
+#[contractevent(topics = ["WALLET", "to_vault"])]
+struct TransferredToVaultEvent {
+    vault: Address,
+    payment_amount: i128,
+    fee_amount: i128,
+    total_amount: i128,
+}
+
 #[contract]
 pub struct UserWallet;
 
 #[contractimpl]
 impl UserWallet {
-    /// Constructor - called once on deployment
     pub fn __constructor(
         env: Env,
         backend: Address,
@@ -53,20 +67,18 @@ impl UserWallet {
         }
     }
 
-    /// Get USDC balance
     pub fn get_balance(env: Env) -> i128 {
         let usdc_token: Address = env.storage().instance().get(&DataKey::UsdcToken).unwrap();
         let token_client = token::Client::new(&env, &usdc_token);
         token_client.balance(&env.current_contract_address())
     }
 
-    /// Withdraw USDC (backend or owner)
     pub fn withdraw(env: Env, caller: Address, amount: i128, recipient: Address) {
         let backend: Address = env.storage().instance().get(&DataKey::Backend).unwrap();
         let owner_opt: Option<Address> = env.storage().instance().get(&DataKey::Owner);
 
         let is_backend = caller == backend;
-        let is_owner = owner_opt.map_or(false, |owner| caller == owner);
+        let is_owner = owner_opt.is_some_and(|owner| caller == owner);
 
         if !is_backend && !is_owner {
             panic!("Not authorized");
@@ -94,7 +106,6 @@ impl UserWallet {
         .publish(&env);
     }
 
-    /// Set owner (backend only)
     pub fn set_owner(env: Env, caller: Address, new_owner: Address) {
         let backend: Address = env.storage().instance().get(&DataKey::Backend).unwrap();
 
@@ -114,7 +125,6 @@ impl UserWallet {
         .publish(&env);
     }
 
-    /// Emergency withdraw (owner only)
     pub fn emergency_withdraw(env: Env, caller: Address) {
         let owner: Address = env
             .storage()
@@ -140,7 +150,50 @@ impl UserWallet {
         EmergencyWithdrawalEvent { amount: balance }.publish(&env);
     }
 
-    // View functions
+    pub fn transfer_to_vault(env: Env, caller: Address, payment_amount: i128) -> i128 {
+        if payment_amount <= 0 {
+            panic!("Payment amount must be > 0");
+        }
+
+        let backend: Address = env.storage().instance().get(&DataKey::Backend).unwrap();
+        let vault: Address = env.storage().instance().get(&DataKey::Vault).unwrap();
+
+        if caller != backend && caller != vault {
+            panic!("Not authorized");
+        }
+
+        caller.require_auth();
+
+        let vault_client = CheeseVaultClient::new(&env, &vault);
+        let fee_amount = vault_client.get_fee_amount();
+        if fee_amount < 0 {
+            panic!("Invalid fee");
+        }
+
+        let total_amount = payment_amount
+            .checked_add(fee_amount)
+            .expect("Amount overflow");
+
+        let balance = Self::get_balance(env.clone());
+        if balance < total_amount {
+            panic!("Insufficient balance");
+        }
+
+        let usdc_token: Address = env.storage().instance().get(&DataKey::UsdcToken).unwrap();
+        let token_client = token::Client::new(&env, &usdc_token);
+        token_client.transfer(&env.current_contract_address(), &vault, &total_amount);
+
+        TransferredToVaultEvent {
+            vault: vault.clone(),
+            payment_amount,
+            fee_amount,
+            total_amount,
+        }
+        .publish(&env);
+
+        total_amount
+    }
+
     pub fn get_backend(env: Env) -> Address {
         env.storage().instance().get(&DataKey::Backend).unwrap()
     }
