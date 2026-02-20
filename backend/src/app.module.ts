@@ -1,5 +1,5 @@
 import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
-import { APP_FILTER } from '@nestjs/core';
+import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { ThrottlerStorageRedisService } from 'nestjs-throttler-storage-redis';
@@ -25,8 +25,11 @@ import { AuthModule } from './auth/auth.module';
 import { PublicModule } from './public/public.module';
 import { PaymentRequestModule } from './payment-request/payment-request.module';
 import { MerchantModule } from './merchant/merchant.module';
-// Middleware
-import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
+// Middleware & interceptors
+import { CorrelationIdMiddleware } from './common/middleware/correlation-id.middleware';
+import { RequestContextMiddleware } from './common/middleware/request-context.middleware';
+import { AppLogger } from './common/logger/app-logger.service';
+import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { EVMModule } from './evm/evm.module';
 import { StellarModule } from './stellar/stellar.module';
 import { MonitoringModule } from './monitoring/monitoring.module';
@@ -89,14 +92,21 @@ import { ExchangeRateModule } from './exchange-rate/exchange-rate.module';
   controllers: [AppController],
   providers: [
     AppService,
+    AppLogger,
     {
       provide: APP_FILTER,
       useClass: SentryFilter,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: LoggingInterceptor,
     },
   ],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer.apply(RequestIdMiddleware).forRoutes('*');
+    consumer
+      .apply(CorrelationIdMiddleware, RequestContextMiddleware)
+      .forRoutes('*');
   }
 }

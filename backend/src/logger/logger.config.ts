@@ -3,6 +3,7 @@ import { utilities as nestWinstonModuleUtilities } from 'nest-winston';
 import DailyRotateFile = require('winston-daily-rotate-file');
 import LokiTransport = require('winston-loki');
 import { maskSensitiveData } from '../common/utils/masking.util';
+import { getRequestContext } from '../common/async-storage/request-context';
 
 export const loggerConfig = {
   levels: {
@@ -32,17 +33,30 @@ const maskingFormat = winston.format((info) => {
   return { ...info, ...masked };
 });
 
+const requestIdFormat = winston.format((info) => {
+  const ctx = getRequestContext();
+  if (ctx?.requestId) {
+    info.requestId = ctx.requestId;
+    if (ctx.adminId) info.adminId = ctx.adminId;
+  }
+  return info;
+});
+
 const getTransports = () => {
+  const isProduction = process.env.NODE_ENV === 'production';
   const transports: winston.transport[] = [
     new winston.transports.Console({
-      level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
+      level: isProduction ? 'info' : 'debug',
       format: winston.format.combine(
+        requestIdFormat(),
         winston.format.timestamp(),
         winston.format.ms(),
-        nestWinstonModuleUtilities.format.nestLike('DABDUB', {
-          colors: true,
-          prettyPrint: true,
-        }),
+        isProduction
+          ? winston.format.json()
+          : nestWinstonModuleUtilities.format.nestLike('DABDUB', {
+              colors: true,
+              prettyPrint: true,
+            }),
       ),
     }),
   ];
@@ -95,6 +109,7 @@ const getTransports = () => {
 export const winstonOptions: winston.LoggerOptions = {
   levels: loggerConfig.levels,
   format: winston.format.combine(
+    requestIdFormat(),
     winston.format.timestamp(),
     maskingFormat(),
     winston.format.json(),

@@ -16,7 +16,7 @@ async function bootstrap() {
 
   const app = await NestFactory.create(AppModule);
 
-  // Use Winston logger
+  // Use Winston logger (see LoggerModule / logger.config: JSON in production, pretty in development)
   app.useLogger(app.get(WINSTON_MODULE_NEST_PROVIDER));
 
   // Global exception filters (order matters - more specific first)
@@ -26,7 +26,7 @@ async function bootstrap() {
   // Global validation pipe
   app.useGlobalPipes(new CustomValidationPipe());
 
-  // Enable CORS with strict config
+  // Enable CORS with strict configuration
   const whitelist = process.env.CORS_WHITELIST ? process.env.CORS_WHITELIST.split(',') : [];
   app.enableCors({
     origin: (origin: string, callback: (err: Error | null, origin?: boolean) => void) => {
