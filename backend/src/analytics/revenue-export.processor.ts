@@ -60,6 +60,7 @@ export class RevenueExportProcessor {
 
     const escape = (v: unknown): string => {
       if (v == null) return '';
+      // eslint-disable-next-line @typescript-eslint/no-base-to-string
       const s = String(v);
       if (/[,"\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
       return s;
