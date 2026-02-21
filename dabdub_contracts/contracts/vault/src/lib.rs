@@ -6,7 +6,25 @@ mod token_helpers;
 
 use soroban_sdk::{
     contract, contractevent, contractimpl, contracttype, token, Address, BytesN, Env, Symbol,
+    Vec,
 };
+
+/// Pending claim record: amounts reserved and expiry ledger for cancellation rules.
+#[contracttype]
+#[derive(Clone)]
+pub struct PendingClaim {
+    pub payment_amount: i128,
+    pub fee_amount: i128,
+    pub expiry_ledger: u32,
+}
+
+#[contracttype]
+#[derive(Clone)]
+pub struct PendingClaim {
+    pub payment_amount: i128,
+    pub fee_amount: i128,
+    pub expiry_ledger: u32,
+}
 
 #[contracttype]
 #[derive(Clone)]
@@ -30,7 +48,6 @@ pub enum DataKey {
     TotalFees,
     Paused,
     PendingClaim(BytesN<32>),
-    AllPendingClaims,
 }
 
 const MAX_FEE: i128 = 5_000_000;
@@ -78,6 +95,7 @@ struct PaymentCancelledEvent {
     force: bool,
 }
 
+/// Ledgers after process_payment after which a claim can be cancelled without force.
 const CLAIM_EXPIRY_LEDGERS: u32 = 10000;
 
 #[contract]
@@ -152,6 +170,7 @@ impl Vault {
         let fee_amount: i128 = env.storage().instance().get(&DataKey::FeeAmount).unwrap();
         let expected_total_amount = payment_amount + fee_amount;
 
+        // Ensure the vault has been funded for this payment before accounting for it.
         let usdc_token: Address = env.storage().instance().get(&DataKey::UsdcToken).unwrap();
         let token_client = token::Client::new(&env, &usdc_token);
         let vault_balance = token_client.balance(&env.current_contract_address());
@@ -190,6 +209,7 @@ impl Vault {
             .instance()
             .set(&DataKey::TotalPayments, &total_payments);
 
+        // Update fee tracking
         let mut available_fees: i128 = available_fees_before;
         let mut total_fees: i128 = env
             .storage()
@@ -217,16 +237,6 @@ impl Vault {
             .instance()
             .set(&DataKey::PendingClaim(payment_id.clone()), &claim);
 
-        let mut all_claims: Vec<BytesN<32>> = env
-            .storage()
-            .instance()
-            .get(&DataKey::AllPendingClaims)
-            .unwrap_or_else(|| Vec::new(&env));
-        all_claims.push_back(payment_id.clone());
-        env.storage()
-            .instance()
-            .set(&DataKey::AllPendingClaims, &all_claims);
-
         PaymentProcessedEvent {
             user_wallet: user_wallet.clone(),
             payment_id: payment_id.clone(),
@@ -236,6 +246,8 @@ impl Vault {
         .publish(&env);
     }
 
+    /// Cancel a pending claim (admin or operator). Returns funds to vault's available pool.
+    /// Without `force`, the claim must have expired (past expiry_ledger).
     pub fn cancel_pending_claim(
         env: Env,
         caller: Address,
@@ -313,22 +325,6 @@ impl Vault {
             .instance()
             .remove(&DataKey::PendingClaim(payment_id.clone()));
 
-        let mut all_claims: Vec<BytesN<32>> = env
-            .storage()
-            .instance()
-            .get(&DataKey::AllPendingClaims)
-            .unwrap_or_else(|| Vec::new(&env));
-        let mut new_claims = Vec::new(&env);
-        for i in 0..all_claims.len() {
-            let claim_id = all_claims.get(i).unwrap();
-            if claim_id != payment_id {
-                new_claims.push_back(claim_id);
-            }
-        }
-        env.storage()
-            .instance()
-            .set(&DataKey::AllPendingClaims, &new_claims);
-
         PaymentCancelledEvent {
             payment_id: payment_id.clone(),
             payment_amount: claim.payment_amount,
@@ -339,6 +335,7 @@ impl Vault {
         .publish(&env);
     }
 
+    /// Refund payment (admin only)
     pub fn refund_payment(
         env: Env,
         caller: Address,
@@ -384,6 +381,7 @@ impl Vault {
             .instance()
             .set(&DataKey::AvailableFees, &available_fees);
 
+        // Transfer USDC back to user
         let usdc_token: Address = env.storage().instance().get(&DataKey::UsdcToken).unwrap();
         let token_client = token::Client::new(&env, &usdc_token);
         token_client.transfer(
@@ -401,6 +399,7 @@ impl Vault {
         .publish(&env);
     }
 
+    /// Withdraw all vault funds (treasurer only)
     pub fn withdraw_vault_funds(env: Env, caller: Address, to: Address) {
         access_control::require_role(&env, &caller, access_control::TREASURER_ROLE);
         caller.require_auth();
@@ -439,6 +438,7 @@ impl Vault {
         .publish(&env);
     }
 
+    /// Update fee (admin only)
     pub fn set_fee(env: Env, caller: Address, new_fee: i128) {
         access_control::require_role(&env, &caller, access_control::ADMIN_ROLE);
         caller.require_auth();
@@ -457,6 +457,7 @@ impl Vault {
         FeeUpdatedEvent { old_fee, new_fee }.publish(&env);
     }
 
+    /// Update minimum deposit (admin only)
     pub fn set_min_deposit(env: Env, caller: Address, new_min_deposit: i128) {
         access_control::require_role(&env, &caller, access_control::ADMIN_ROLE);
         caller.require_auth();
@@ -477,6 +478,7 @@ impl Vault {
         .publish(&env);
     }
 
+    /// Pause contract (admin only)
     pub fn pause(env: Env, caller: Address) {
         access_control::require_role(&env, &caller, access_control::ADMIN_ROLE);
         caller.require_auth();
@@ -590,7 +592,7 @@ impl Vault {
             .storage()
             .instance()
             .get(&DataKey::PendingClaim(payment_id));
-
+        
         match claim {
             Some(c) => {
                 let current_ledger = env.ledger().sequence();
@@ -602,9 +604,5 @@ impl Vault {
 
     pub fn get_recipient_pending_claims(env: Env, _recipient: Address) -> Vec<BytesN<32>> {
         Vec::new(&env)
-    }
-
-    pub fn get_claim_period(env: Env) -> (bool, u64) {
-        (true, CLAIM_EXPIRY_LEDGERS as u64)
     }
 }

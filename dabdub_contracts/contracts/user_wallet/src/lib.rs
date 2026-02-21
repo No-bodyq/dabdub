@@ -7,7 +7,6 @@ use soroban_sdk::{
 #[contractclient(name = "CheeseVaultClient")]
 pub trait CheeseVaultTrait {
     fn get_fee_amount(env: Env) -> i128;
-    fn get_claim_period(env: Env) -> (bool, u64);
 }
 
 #[contracttype]
@@ -42,8 +41,6 @@ struct TransferredToVaultEvent {
     payment_amount: i128,
     fee_amount: i128,
     total_amount: i128,
-    is_claim_based: bool,
-    recipient: Option<Address>,
 }
 
 #[contract]
@@ -152,12 +149,8 @@ impl UserWallet {
         EmergencyWithdrawalEvent { amount: balance }.publish(&env);
     }
 
-    pub fn transfer_to_vault(
-        env: Env,
-        caller: Address,
-        payment_amount: i128,
-        recipient: Option<Address>,
-    ) -> i128 {
+    /// Transfer USDC to vault for payment processing (backend or vault only)
+    pub fn transfer_to_vault(env: Env, caller: Address, payment_amount: i128) -> i128 {
         if payment_amount <= 0 {
             panic!("Payment amount must be > 0");
         }
@@ -169,6 +162,7 @@ impl UserWallet {
             panic!("Not authorized");
         }
 
+        // Backend and vault calls must be authorized by the caller.
         caller.require_auth();
 
         let vault_client = CheeseVaultClient::new(&env, &vault);
@@ -176,9 +170,6 @@ impl UserWallet {
         if fee_amount < 0 {
             panic!("Invalid fee");
         }
-
-        let (claim_period_enabled, _claim_period_duration) = vault_client.get_claim_period();
-        let is_claim_based = claim_period_enabled && recipient.is_some();
 
         let total_amount = payment_amount
             .checked_add(fee_amount)
@@ -198,14 +189,13 @@ impl UserWallet {
             payment_amount,
             fee_amount,
             total_amount,
-            is_claim_based,
-            recipient,
         }
         .publish(&env);
 
         total_amount
     }
 
+    // View functions
     pub fn get_backend(env: Env) -> Address {
         env.storage().instance().get(&DataKey::Backend).unwrap()
     }

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { Space_Grotesk } from "next/font/google";
+import { Space_Grotesk, Mochiy_Pop_One } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import InstallPrompt from "@/components/InstallPrompt";
 import ConnectivityStatus from "@/components/ConnectivityStatus";
@@ -8,6 +9,33 @@ import ConnectivityStatus from "@/components/ConnectivityStatus";
 const spaceGrotesk = Space_Grotesk({
   subsets: ["latin"],
   display: "swap",
+});
+
+const mochiy = Mochiy_Pop_One({
+  weight: "400",
+  subsets: ["latin"],
+  variable: "--font-mochiy",
+});
+
+const helvetica = localFont({
+  src: [
+    {
+      path: "../public/font/helvetica-neue-5/HelveticaNeueRoman.otf",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "../public/font/helvetica-neue-5/HelveticaNeueMedium.otf",
+      weight: "500",
+      style: "normal",
+    },
+    {
+      path: "../public/font/helvetica-neue-5/HelveticaNeueBold.otf",
+      weight: "700",
+      style: "normal",
+    },
+  ],
+  variable: "--font-helvetica",
 });
 
 export const metadata: Metadata = {
@@ -33,7 +61,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className={spaceGrotesk.className}>
+    <html lang="en" className={`${spaceGrotesk.className} ${helvetica.variable} ${mochiy.variable}`}>
       <body>
         {/* <ConnectivityStatus />
         <InstallPrompt /> */}

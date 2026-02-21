@@ -257,41 +257,15 @@ fn test_transfer_to_vault_by_backend() {
     let wallet_id = env.register(UserWallet, (&backend, &vault_id, &usdc, &None::<Address>));
     let wallet = UserWalletClient::new(&env, &wallet_id);
 
+    // Mint tokens to wallet
     let token_admin_client = token::StellarAssetClient::new(&env, &usdc);
     token_admin_client.mint(&wallet_id, &100_000_000);
 
-    let total_amount = wallet.transfer_to_vault(&backend, &50_000_000, &None::<Address>);
+    // Transfer payment + fee to vault
+    let total_amount = wallet.transfer_to_vault(&backend, &50_000_000);
     assert_eq!(total_amount, 50_500_000);
 
-    let token_client = token::Client::new(&env, &usdc);
-    assert_eq!(token_client.balance(&vault_id), 50_500_000);
-    assert_eq!(token_client.balance(&wallet_id), 49_500_000);
-}
-
-#[test]
-fn test_transfer_to_vault_with_recipient() {
-    let env = Env::default();
-    env.mock_all_auths();
-
-    let backend = Address::generate(&env);
-    let admin = Address::generate(&env);
-    let recipient = Address::generate(&env);
-
-    let token_admin = Address::generate(&env);
-    let asset_contract = env.register_stellar_asset_contract_v2(token_admin.clone());
-    let usdc = asset_contract.address();
-
-    let vault_id = env.register(Vault, (&admin, &usdc, &500_000i128, &1_000_000i128));
-
-    let wallet_id = env.register(UserWallet, (&backend, &vault_id, &usdc, &None::<Address>));
-    let wallet = UserWalletClient::new(&env, &wallet_id);
-
-    let token_admin_client = token::StellarAssetClient::new(&env, &usdc);
-    token_admin_client.mint(&wallet_id, &100_000_000);
-
-    let total_amount = wallet.transfer_to_vault(&backend, &50_000_000, &Some(recipient.clone()));
-    assert_eq!(total_amount, 50_500_000);
-
+    // Verify balances
     let token_client = token::Client::new(&env, &usdc);
     assert_eq!(token_client.balance(&vault_id), 50_500_000);
     assert_eq!(token_client.balance(&wallet_id), 49_500_000);
@@ -314,10 +288,11 @@ fn test_transfer_to_vault_insufficient_balance_including_fee() {
     let wallet_id = env.register(UserWallet, (&backend, &vault_id, &usdc, &None::<Address>));
     let wallet = UserWalletClient::new(&env, &wallet_id);
 
+    // Only mint the payment amount (not enough for payment + fee)
     let token_admin_client = token::StellarAssetClient::new(&env, &usdc);
     token_admin_client.mint(&wallet_id, &50_000_000);
 
-    wallet.transfer_to_vault(&backend, &50_000_000, &None::<Address>);
+    wallet.transfer_to_vault(&backend, &50_000_000);
 }
 
 #[test]
@@ -338,5 +313,5 @@ fn test_transfer_to_vault_unauthorized() {
     let wallet_id = env.register(UserWallet, (&backend, &vault_id, &usdc, &None::<Address>));
     let wallet = UserWalletClient::new(&env, &wallet_id);
 
-    wallet.transfer_to_vault(&unauthorized, &10_000_000, &None::<Address>);
+    wallet.transfer_to_vault(&unauthorized, &10_000_000);
 }

@@ -1,0 +1,44 @@
+version: "3.9"
+
+services:
+  backend:
+    image: ${IMAGE}
+    container_name: dabdub-backend
+    env_file:
+      - .env
+    ports:
+      - "${APP_PORT:-4000}:4000"
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: dabdub_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: dabdub_dev
+    ports:
+      - "5445:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:alpine
+    container_name: dabdub_redis
+    ports:
+      - "6379:6379"
+    restart: always
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  postgres_data:

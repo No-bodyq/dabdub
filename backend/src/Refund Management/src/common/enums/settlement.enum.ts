@@ -1,0 +1,13 @@
+export enum SettlementStatus {
+  PENDING = "PENDING",
+  PROCESSING = "PROCESSING",
+  COMPLETED = "COMPLETED",
+  FAILED = "FAILED",
+  ON_HOLD = "ON_HOLD",
+}
+
+export enum TransactionStatus {
+  CONFIRMED = "CONFIRMED",
+  SETTLED = "SETTLED",
+  SETTLEMENT_PENDING = "SETTLEMENT_PENDING",
+}
