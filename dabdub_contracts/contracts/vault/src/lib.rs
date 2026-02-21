@@ -6,9 +6,18 @@ mod token_helpers;
 
 use soroban_sdk::{
     contract, contractevent, contractimpl, contracttype, token, Address, BytesN, Env, Symbol,
+    Vec,
 };
 
 /// Pending claim record: amounts reserved and expiry ledger for cancellation rules.
+#[contracttype]
+#[derive(Clone)]
+pub struct PendingClaim {
+    pub payment_amount: i128,
+    pub fee_amount: i128,
+    pub expiry_ledger: u32,
+}
+
 #[contracttype]
 #[derive(Clone)]
 pub struct PendingClaim {
@@ -33,9 +42,8 @@ pub enum DataKey {
     PendingClaim(BytesN<32>),
 }
 
-const MAX_FEE: i128 = 5_000_000; // $5 in USDC (7 decimals)
+const MAX_FEE: i128 = 5_000_000;
 
-// Events
 #[contractevent(topics = ["VAULT", "payment"])]
 struct PaymentProcessedEvent {
     user_wallet: Address,
@@ -87,7 +95,6 @@ pub struct Vault;
 
 #[contractimpl]
 impl Vault {
-    /// Constructor
     pub fn __constructor(
         env: Env,
         admin: Address,
@@ -121,11 +128,14 @@ impl Vault {
         env.storage().instance().set(&DataKey::TotalFees, &0i128);
         env.storage().instance().set(&DataKey::Paused, &false);
 
-        // Grant admin role
+        let empty_vec: Vec<BytesN<32>> = Vec::new(&env);
+        env.storage()
+            .instance()
+            .set(&DataKey::AllPendingClaims, &empty_vec);
+
         access_control::grant_role(&env, admin, access_control::ADMIN_ROLE);
     }
 
-    /// Process payment (operator only)
     pub fn process_payment(
         env: Env,
         caller: Address,
@@ -157,7 +167,6 @@ impl Vault {
         let token_client = token::Client::new(&env, &usdc_token);
         let vault_balance = token_client.balance(&env.current_contract_address());
 
-        // Update payment tracking
         let mut available_payments: i128 = env
             .storage()
             .instance()
@@ -469,7 +478,6 @@ impl Vault {
         env.storage().instance().set(&DataKey::Paused, &true);
     }
 
-    /// Unpause contract (admin only)
     pub fn unpause(env: Env, caller: Address) {
         access_control::require_role(&env, &caller, access_control::ADMIN_ROLE);
         caller.require_auth();
@@ -477,7 +485,6 @@ impl Vault {
         env.storage().instance().set(&DataKey::Paused, &false);
     }
 
-    /// Grant role (admin only)
     pub fn grant_role(env: Env, caller: Address, account: Address, role: Symbol) {
         access_control::require_role(&env, &caller, access_control::ADMIN_ROLE);
         caller.require_auth();
@@ -485,7 +492,6 @@ impl Vault {
         access_control::grant_role(&env, account, role);
     }
 
-    /// Revoke role (admin only)
     pub fn revoke_role(env: Env, caller: Address, account: Address, role: Symbol) {
         access_control::require_role(&env, &caller, access_control::ADMIN_ROLE);
         caller.require_auth();
@@ -493,7 +499,6 @@ impl Vault {
         access_control::revoke_role(&env, account, role);
     }
 
-    // View functions
     pub fn has_role(env: Env, account: Address, role: Symbol) -> bool {
         access_control::has_role(&env, &account, role)
     }
@@ -550,5 +555,46 @@ impl Vault {
         let required_balance = available_payments + available_fees;
 
         vault_balance >= required_balance
+    }
+
+    pub fn get_pending_claim(env: Env, payment_id: BytesN<32>) -> Option<PendingClaim> {
+        env.storage()
+            .instance()
+            .get(&DataKey::PendingClaim(payment_id))
+    }
+
+    pub fn get_all_pending_claims(env: Env) -> Vec<BytesN<32>> {
+        env.storage()
+            .instance()
+            .get(&DataKey::AllPendingClaims)
+            .unwrap_or_else(|| Vec::new(&env))
+    }
+
+    pub fn get_pending_claims_count(env: Env) -> u32 {
+        let all_claims: Vec<BytesN<32>> = env
+            .storage()
+            .instance()
+            .get(&DataKey::AllPendingClaims)
+            .unwrap_or_else(|| Vec::new(&env));
+        all_claims.len()
+    }
+
+    pub fn is_claim_expired(env: Env, payment_id: BytesN<32>) -> bool {
+        let claim: Option<PendingClaim> = env
+            .storage()
+            .instance()
+            .get(&DataKey::PendingClaim(payment_id));
+        
+        match claim {
+            Some(c) => {
+                let current_ledger = env.ledger().sequence();
+                current_ledger >= c.expiry_ledger
+            }
+            None => false,
+        }
+    }
+
+    pub fn get_recipient_pending_claims(env: Env, _recipient: Address) -> Vec<BytesN<32>> {
+        Vec::new(&env)
     }
 }
