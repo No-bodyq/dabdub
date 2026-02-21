@@ -120,6 +120,31 @@ describe('PaymentRequestRepository', () => {
     });
   });
 
+  describe('findByTxHashAndNetwork', () => {
+    it('should find by tx hash and network', async () => {
+      const pr = {
+        id: '1',
+        onChainTxHash: 'abc123',
+        stellarNetwork: 'testnet',
+      };
+      mockTypeOrmRepo.findOne.mockResolvedValue(pr);
+
+      const result = await repository.findByTxHashAndNetwork('abc123', 'testnet');
+
+      expect(result).toEqual(pr);
+      expect(mockTypeOrmRepo.findOne).toHaveBeenCalledWith({
+        where: { onChainTxHash: 'abc123', stellarNetwork: 'testnet' },
+      });
+    });
+
+    it('should return null when not found', async () => {
+      mockTypeOrmRepo.findOne.mockResolvedValue(null);
+
+      const result = await repository.findByTxHashAndNetwork('unknown', 'mainnet');
+      expect(result).toBeNull();
+    });
+  });
+
   describe('findByIdempotencyKey', () => {
     it('should find by idempotency key', async () => {
       const pr = { id: '1', idempotencyKey: 'key-1' };

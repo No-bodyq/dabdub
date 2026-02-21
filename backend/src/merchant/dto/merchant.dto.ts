@@ -1,6 +1,7 @@
 import {
   IsEmail,
   IsNotEmpty,
+  IsNumber,
   IsString,
   MinLength,
   IsOptional,
@@ -268,6 +269,22 @@ export class SettingsDto {
   @IsOptional()
   @IsString()
   currency?: string;
+
+  @ApiPropertyOptional({
+    example: 0.1,
+    description: 'Minimum payment amount per request (overrides global config)',
+  })
+  @IsOptional()
+  @IsNumber()
+  paymentAmountMin?: number;
+
+  @ApiPropertyOptional({
+    example: 10000,
+    description: 'Maximum payment amount per request (overrides global config)',
+  })
+  @IsOptional()
+  @IsNumber()
+  paymentAmountMax?: number;
 }
 
 export class KycDocumentsDto {

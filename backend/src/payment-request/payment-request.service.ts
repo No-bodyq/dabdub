@@ -1,4 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Merchant } from '../database/entities/merchant.entity';
 import { PaymentRequestRepository } from './repositories/payment-request.repository';
 import { QrCodeService } from './services/qr-code.service';
 import { StellarContractService } from './services/stellar-contract.service';
@@ -47,6 +50,8 @@ export class PaymentRequestService {
 
   constructor(
     private readonly repository: PaymentRequestRepository,
+    @InjectRepository(Merchant)
+    private readonly merchantRepository: Repository<Merchant>,
     private readonly qrCodeService: QrCodeService,
     private readonly stellarContractService: StellarContractService,
     private readonly configService: GlobalConfigService,
@@ -54,19 +59,13 @@ export class PaymentRequestService {
 
   async create(dto: CreatePaymentRequestDto): Promise<PaymentRequest> {
     const stellarConfig = this.configService.getStellarConfig();
+    const { minAmount, maxAmount } = await this.getAmountLimits(dto.merchantId);
 
-    // Validate amount against config limits
-    if (dto.amount < stellarConfig.minPaymentAmount) {
-      throw new PaymentRequestAmountTooLowException(
-        dto.amount,
-        stellarConfig.minPaymentAmount,
-      );
+    if (dto.amount < minAmount) {
+      throw new PaymentRequestAmountTooLowException(dto.amount, minAmount);
     }
-    if (dto.amount > stellarConfig.maxPaymentAmount) {
-      throw new PaymentRequestAmountTooHighException(
-        dto.amount,
-        stellarConfig.maxPaymentAmount,
-      );
+    if (dto.amount > maxAmount) {
+      throw new PaymentRequestAmountTooHighException(dto.amount, maxAmount);
     }
 
     // Idempotency: return existing record if key matches
@@ -107,6 +106,9 @@ export class PaymentRequestService {
       customerName: dto.customerName,
       customerEmail: dto.customerEmail,
       customerPhone: dto.customerPhone,
+      customerWalletAddress: dto.customerWalletAddress ?? null,
+      customerId: dto.customerId ?? null,
+      webhookUrl: dto.webhookUrl ?? null,
       expiresAt,
       idempotencyKey: dto.idempotencyKey,
       metadata: dto.metadata,
@@ -135,19 +137,15 @@ export class PaymentRequestService {
       throw new PaymentRequestInvalidStatusException(request.status, 'update');
     }
 
-    const stellarConfig = this.configService.getStellarConfig();
     if (dto.amount !== undefined) {
-      if (dto.amount < stellarConfig.minPaymentAmount) {
-        throw new PaymentRequestAmountTooLowException(
-          dto.amount,
-          stellarConfig.minPaymentAmount,
-        );
+      const { minAmount, maxAmount } = await this.getAmountLimits(
+        request.merchantId,
+      );
+      if (dto.amount < minAmount) {
+        throw new PaymentRequestAmountTooLowException(dto.amount, minAmount);
       }
-      if (dto.amount > stellarConfig.maxPaymentAmount) {
-        throw new PaymentRequestAmountTooHighException(
-          dto.amount,
-          stellarConfig.maxPaymentAmount,
-        );
+      if (dto.amount > maxAmount) {
+        throw new PaymentRequestAmountTooHighException(dto.amount, maxAmount);
       }
     }
 
@@ -160,6 +158,10 @@ export class PaymentRequestService {
       updateData.customerEmail = dto.customerEmail;
     if (dto.customerPhone !== undefined)
       updateData.customerPhone = dto.customerPhone;
+    if (dto.customerWalletAddress !== undefined)
+      updateData.customerWalletAddress = dto.customerWalletAddress;
+    if (dto.customerId !== undefined) updateData.customerId = dto.customerId;
+    if (dto.webhookUrl !== undefined) updateData.webhookUrl = dto.webhookUrl;
     if (dto.expiresAt !== undefined)
       updateData.expiresAt = new Date(dto.expiresAt);
     if (dto.metadata !== undefined) updateData.metadata = dto.metadata;
@@ -238,9 +240,16 @@ export class PaymentRequestService {
       network: request.stellarNetwork,
     });
 
-    // Check if cached
-    if (request.qrCodeData) {
-      return { qrCode: request.qrCodeData, uri };
+    const cachedData = request.qrCodeData;
+    const cachedImage =
+      cachedData &&
+      typeof cachedData === 'object' &&
+      'imageBase64' in cachedData
+        ? (cachedData as { imageBase64?: string }).imageBase64
+        : undefined;
+
+    if (cachedImage) {
+      return { qrCode: cachedImage, uri };
     }
 
     const qrCode = await this.qrCodeService.generateQrCode({
@@ -250,8 +259,9 @@ export class PaymentRequestService {
       network: request.stellarNetwork,
     });
 
-    // Cache it
-    await this.repository.update(id, { qrCodeData: qrCode });
+    await this.repository.update(id, {
+      qrCodeData: { uri, format: 'sep0007', imageBase64: qrCode },
+    });
 
     return { qrCode, uri };
   }
@@ -301,6 +311,27 @@ export class PaymentRequestService {
       dto.fromDate ? new Date(dto.fromDate) : undefined,
       dto.toDate ? new Date(dto.toDate) : undefined,
     );
+  }
+
+  private async getAmountLimits(
+    merchantId: string,
+  ): Promise<{ minAmount: number; maxAmount: number }> {
+    const stellarConfig = this.configService.getStellarConfig();
+    const merchant = await this.merchantRepository.findOne({
+      where: { id: merchantId },
+      select: ['settings'],
+    });
+
+    const settings = merchant?.settings as
+      | { paymentAmountMin?: number; paymentAmountMax?: number }
+      | undefined;
+
+    return {
+      minAmount:
+        settings?.paymentAmountMin ?? stellarConfig.minPaymentAmount,
+      maxAmount:
+        settings?.paymentAmountMax ?? stellarConfig.maxPaymentAmount,
+    };
   }
 
   private validateTransition(

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { PaymentRequest } from '../database/entities/payment-request.entity';
+import { Merchant } from '../database/entities/merchant.entity';
 import { PaymentRequestRepository } from './repositories/payment-request.repository';
 import { PaymentRequestService } from './payment-request.service';
 import { PaymentRequestController } from './payment-request.controller';
@@ -10,7 +11,10 @@ import { StellarContractService } from './services/stellar-contract.service';
 import { GlobalConfigModule } from '../config/config.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([PaymentRequest]), GlobalConfigModule],
+  imports: [
+    TypeOrmModule.forFeature([PaymentRequest, Merchant]),
+    GlobalConfigModule,
+  ],
   controllers: [PaymentRequestController],
   providers: [
     PaymentRequestRepository,

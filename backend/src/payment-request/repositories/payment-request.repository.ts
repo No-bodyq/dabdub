@@ -28,6 +28,15 @@ export class PaymentRequestRepository {
     return this.repository.findOne({ where: { idempotencyKey } });
   }
 
+  async findByTxHashAndNetwork(
+    txHash: string,
+    network: string,
+  ): Promise<PaymentRequest | null> {
+    return this.repository.findOne({
+      where: { onChainTxHash: txHash, stellarNetwork: network },
+    });
+  }
+
   async update(
     id: string,
     data: Partial<PaymentRequest>,

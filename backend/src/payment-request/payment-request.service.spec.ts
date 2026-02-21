@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
 import { PaymentRequestService } from './payment-request.service';
 import { PaymentRequestRepository } from './repositories/payment-request.repository';
 import { QrCodeService } from './services/qr-code.service';
@@ -8,6 +9,7 @@ import {
   PaymentRequestStatus,
   PaymentRequest,
 } from '../database/entities/payment-request.entity';
+import { Merchant } from '../database/entities/merchant.entity';
 import {
   PaymentRequestNotFoundException,
   PaymentRequestInvalidStatusException,
@@ -50,6 +52,10 @@ const mockConfigService = {
   getStellarConfig: jest.fn().mockReturnValue(mockStellarConfig),
 };
 
+const mockMerchantRepository = {
+  findOne: jest.fn().mockResolvedValue({ settings: null }),
+};
+
 describe('PaymentRequestService', () => {
   let service: PaymentRequestService;
 
@@ -64,6 +70,10 @@ describe('PaymentRequestService', () => {
           useValue: mockStellarContractService,
         },
         { provide: GlobalConfigService, useValue: mockConfigService },
+        {
+          provide: getRepositoryToken(Merchant),
+          useValue: mockMerchantRepository,
+        },
       ],
     }).compile();
 
@@ -315,7 +325,7 @@ describe('PaymentRequestService', () => {
         id: 'test-id',
         amount: 10,
         stellarNetwork: 'testnet',
-        qrCodeData: 'cached-base64',
+        qrCodeData: { imageBase64: 'cached-base64', format: 'sep0007' },
       } as any;
       mockRepository.findById.mockResolvedValue(pr);
       mockQrCodeService.buildSep0007Uri.mockReturnValue('web+stellar:pay?...');
@@ -342,9 +352,15 @@ describe('PaymentRequestService', () => {
 
       expect(result.qrCode).toBe('new-base64');
       expect(mockQrCodeService.generateQrCode).toHaveBeenCalled();
-      expect(mockRepository.update).toHaveBeenCalledWith('test-id', {
-        qrCodeData: 'new-base64',
-      });
+      expect(mockRepository.update).toHaveBeenCalledWith(
+        'test-id',
+        expect.objectContaining({
+          qrCodeData: expect.objectContaining({
+            format: 'sep0007',
+            imageBase64: 'new-base64',
+          }),
+        }),
+      );
     });
   });
 });

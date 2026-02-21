@@ -14,6 +14,12 @@ import { Merchant } from './merchant.entity';
 import { Settlement } from '../../settlement/entities/settlement.entity';
 import { Transaction } from '../../transactions/entities/transaction.entity';
 
+export interface PaymentRequestQrCodeData {
+  uri: string;
+  format: 'sep0007';
+  imageBase64?: string;
+}
+
 export enum PaymentRequestStatus {
   PENDING = 'pending',
   PROCESSING = 'processing',
@@ -43,6 +49,10 @@ export enum PaymentRequestType {
 @Index(['onChainPaymentId'], {
   unique: true,
   where: '"on_chain_payment_id" IS NOT NULL',
+})
+@Index(['onChainTxHash', 'stellarNetwork'], {
+  unique: true,
+  where: '"on_chain_tx_hash" IS NOT NULL AND "stellar_network" IS NOT NULL',
 })
 export class PaymentRequest {
   @PrimaryGeneratedColumn('uuid')
@@ -100,6 +110,16 @@ export class PaymentRequest {
   onChainTxHash!: string;
 
   @Column({
+    name: 'block_number',
+    type: 'bigint',
+    nullable: true,
+  })
+  blockNumber!: string | null;
+
+  @Column({ type: 'int', nullable: true })
+  confirmations!: number | null;
+
+  @Column({
     name: 'user_wallet_address',
     type: 'varchar',
     length: 56,
@@ -140,6 +160,30 @@ export class PaymentRequest {
   })
   customerPhone!: string;
 
+  @Column({
+    name: 'customer_wallet_address',
+    type: 'varchar',
+    length: 128,
+    nullable: true,
+  })
+  customerWalletAddress!: string | null;
+
+  @Column({
+    name: 'customer_id',
+    type: 'varchar',
+    length: 255,
+    nullable: true,
+  })
+  customerId!: string | null;
+
+  @Column({
+    name: 'webhook_url',
+    type: 'varchar',
+    length: 500,
+    nullable: true,
+  })
+  webhookUrl!: string | null;
+
   @Column({ name: 'expires_at', type: 'timestamp', nullable: true })
   expiresAt!: Date;
 
@@ -154,8 +198,8 @@ export class PaymentRequest {
   })
   idempotencyKey!: string;
 
-  @Column({ name: 'qr_code_data', type: 'text', nullable: true })
-  qrCodeData!: string;
+  @Column({ name: 'qr_code_data', type: 'jsonb', nullable: true })
+  qrCodeData!: PaymentRequestQrCodeData | null;
 
   @Column({ name: 'status_history', type: 'jsonb', default: '[]' })
   statusHistory!: Array<{ status: string; timestamp: string; reason?: string }>;
