@@ -26,6 +26,7 @@ import { BankAccountsModule } from './bank-accounts/bank-accounts.module';
 import { PayLinkModule } from './paylink/paylink.module';
 import { AdminModule } from './admin/admin.module';
 import { SmsModule } from './sms/sms.module';
+import { PushModule } from './push/push.module';
 
 @Module({
   imports: [
@@ -98,6 +99,9 @@ import { SmsModule } from './sms/sms.module';
 
     // 10. SMS — OTP + transaction alerts via Termii + BullMQ.
     SmsModule,
+
+    // 11. Push — Firebase Cloud Messaging device token management.
+    PushModule,
   ],
   providers: [
     {
