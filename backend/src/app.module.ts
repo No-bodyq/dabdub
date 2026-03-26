@@ -27,6 +27,7 @@ import { PayLinkModule } from './paylink/paylink.module';
 import { AdminModule } from './admin/admin.module';
 import { EarningsModule } from './earnings/earnings.module';
 import { SmsModule } from './sms/sms.module';
+import { PasskeyModule } from './passkey/passkey.module';
 
 @Module({
   imports: [
@@ -105,6 +106,9 @@ import { SmsModule } from './sms/sms.module';
 
     // 10. Earnings — yield dashboard, APY display, projections.
     EarningsModule,
+
+    // Passkey/WebAuthn authentication.
+    PasskeyModule,
   ],
   providers: [
     {
