@@ -29,6 +29,7 @@ import { PayLinkModule } from './paylink/paylink.module';
 import { AdminModule } from './admin/admin.module';
 import { EarningsModule } from './earnings/earnings.module';
 import { SmsModule } from './sms/sms.module';
+import { SecurityModule } from './security/security.module';
 
 @Module({
   imports: [
@@ -99,6 +100,7 @@ import { SmsModule } from './sms/sms.module';
 
     MerchantsModule,
     UsersModule,
+    SecurityModule,
     BankAccountsModule,
     PayLinkModule,
     AdminModule,

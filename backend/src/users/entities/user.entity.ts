@@ -71,4 +71,18 @@ export class User extends BaseEntity {
 
   @Column({ name: 'is_active', default: true })
   isActive!: boolean;
+
+  // ── Security Features ────────────────────────────────────────
+
+  @Column({ name: 'email_verified', default: false })
+  emailVerified!: boolean;
+
+  @Column({ name: 'phone_verified', default: false })
+  phoneVerified!: boolean;
+
+  @Column({ name: 'pin_hash', length: 255, nullable: true, default: null })
+  pinHash!: string | null;
+
+  @Column({ name: 'passkey_id', length: 255, nullable: true, default: null })
+  passkeyId!: string | null;
 }
