@@ -7,3 +7,4 @@ import { Transaction } from './entities/transaction.entity';
   exports: [TypeOrmModule],
 })
 export class TransactionsModule {}
+export class TransactionsModule {}

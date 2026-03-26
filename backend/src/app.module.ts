@@ -13,6 +13,7 @@ import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { UploadModule } from './uploads/upload.module';
 import { WsModule } from './ws/ws.module';
+import { TierConfigModule } from './tier-config/tier-config.module';
 import { VirtualAccountModule } from './virtual-account/virtual-account.module';
 import { RatesModule } from './rates/rates.module';
 import { SorobanModule } from './soroban/soroban.module';
@@ -72,6 +73,8 @@ import { TransactionsModule } from './transactions/transactions.module';
     // 7. WebSockets — Socket.io real-time gateway.
     WsModule,
 
+    // 7. Tier Config — membership tiers and limits.
+    TierConfigModule,
     // 7. Virtual Accounts — Flutterwave integration for NGN deposits.
     VirtualAccountModule,
 

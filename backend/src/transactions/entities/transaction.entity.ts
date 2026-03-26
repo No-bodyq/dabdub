@@ -1,3 +1,10 @@
+import { Entity, Column } from 'typeorm';
+import { BaseEntity } from '../../common/entities/base.entity';
+
+export enum TransactionType {
+  TRANSFER_IN = 'transfer_in',
+  TRANSFER_OUT = 'transfer_out',
+  WITHDRAWAL = 'withdrawal',
 import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm';
 import { BaseEntity } from '../../common/entities/base.entity';
 
@@ -21,6 +28,14 @@ export class Transaction extends BaseEntity {
   @Column({ type: 'enum', enum: TransactionType })
   type!: TransactionType;
 
+  @Column({
+    name: 'amount_usdc',
+    type: 'numeric',
+    precision: 24,
+    scale: 8,
+  })
+  amountUsdc!: string;
+}
   @Column({ name: 'amount', type: 'decimal', precision: 15, scale: 6 })
   amount!: number;
 
