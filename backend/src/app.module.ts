@@ -5,7 +5,6 @@ import { ConfigType } from '@nestjs/config';
 import { BullModule } from '@nestjs/bull';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { AppConfigModule, appConfig, redisConfig } from './config';
-import { CacheModule } from './cache/cache.module';
 import { EmailModule } from './email/email.module';
 import { RatesModule } from './rates/rates.module';
 import { DatabaseModule } from './database/database.module';
@@ -20,10 +19,12 @@ import { LoggingModule } from './logging/logging.module';
 import { CorrelationIdMiddleware } from './logging/correlation-id.middleware';
 import { HttpLoggingInterceptor } from './logging/http-logging.interceptor';
 import { WebhooksModule } from './webhooks/webhooks.module';
+import { RbacModule } from './rbac/rbac.module';
 import { MerchantsModule } from './merchants/merchants.module';
 import { UsersModule } from './users/users.module';
 import { BankAccountsModule } from './bank-accounts/bank-accounts.module';
 import { PayLinkModule } from './paylink/paylink.module';
+import { AdminModule } from './admin/admin.module';
 import { SmsModule } from './sms/sms.module';
 
 @Module({
@@ -39,7 +40,7 @@ import { SmsModule } from './sms/sms.module';
 
     // 4. Bull — async Redis connection via typed RedisConfig.
     BullModule.forRootAsync({
-      inject: [redisConfig.KEY],
+   t: [redisConfig.KEY],
       useFactory: (redis: ConfigType<typeof redisConfig>) => ({
         redis: {
           host: redis.host,
@@ -71,33 +72,32 @@ import { SmsModule } from './sms/sms.module';
     // 7. Rates — USDC/NGN live rates with Redis cache + BullMQ polling.
     RatesModule,
 
-    // 8. Auth — register/login/refresh/logout + global JWT guard. — register/login/refresh/logout + global JWT guard.
+    // 8. Auth — register/login/refresh/logout + global JWT guard.
     AuthModule,
 
     // 6. File uploads — presign + confirm via Cloudflare R2.
     UploadModule,
 
     // 7. WebSockets — Socket.io real-time gateway.
-    WsModule,
-
-    // 7. Notifications — entity + API + realtime delivery.
+    WsModul. Notifications — entity + API + realtime delivery.
     NotificationsModule,
 
     // 8. Webhooks — subscriptions + signed deliveries + retries.
     WebhooksModule,
 
+    // 9. RBAC — roles + permissions for admin routes.
+    RbacModule,
+
     MerchantsModule,
-
     UsersModule,
-
     BankAccountsModule,
-
     PayLinkModule,
-    // 9. SMS — OTP + transaction alerts via Termii + BullMQ.
+    AdminModule,
+
+    // 10. SMS — OTP + transaction alerts via Termii + BullMQ.
     SmsModule,
   ],
   providers: [
-    // Global guard: every route requires a valid JWT unless decorated @Public().
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
@@ -113,4 +113,3 @@ export class AppModule implements NestModule {
     consumer.apply(CorrelationIdMiddleware).forRoutes('*');
   }
 }
-
