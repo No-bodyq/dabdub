@@ -312,7 +312,7 @@ export class VirtualCardService {
       order: { createdAt: 'DESC' },
     });
 
-    return cards.map((c) => VirtualCardResponseDto.fromEntity(c));
+    return cards.map((c: VirtualCard) => VirtualCardResponseDto.fromEntity(c));
   }
 
   /**
@@ -376,7 +376,8 @@ export class VirtualCardService {
       );
       return data;
     } catch (error) {
-      this.logger.error(`Failed to create card via Sudo: ${error.message}`);
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Failed to create card via Sudo: ${message}`);
       throw new BadRequestException('Failed to create card');
     }
   }
@@ -396,7 +397,8 @@ export class VirtualCardService {
         ),
       );
     } catch (error) {
-      this.logger.error(`Failed to fund card via Sudo: ${error.message}`);
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Failed to fund card via Sudo: ${message}`);
       throw new BadRequestException('Failed to fund card');
     }
   }
@@ -416,7 +418,8 @@ export class VirtualCardService {
         ),
       );
     } catch (error) {
-      this.logger.error(`Failed to freeze card via Sudo: ${error.message}`);
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Failed to freeze card via Sudo: ${message}`);
       throw new BadRequestException('Failed to update card status');
     }
   }
@@ -434,7 +437,8 @@ export class VirtualCardService {
         ),
       );
     } catch (error) {
-      this.logger.error(`Failed to terminate card via Sudo: ${error.message}`);
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Failed to terminate card via Sudo: ${message}`);
       throw new BadRequestException('Failed to terminate card');
     }
   }
