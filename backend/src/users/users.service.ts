@@ -123,5 +123,16 @@ export class UsersService {
     await this.analyticsService.invalidateDashboardCache().catch(() => {});
     return saved;
   }
+
+  /**
+   * Find all active users for notifications
+   * @returns Array of active users
+   */
+  async findActiveUsers(): Promise<User[]> {
+    return this.usersRepository.find({
+      where: { isActive: true },
+      select: ['id', 'email', 'firstName'],
+    });
+  }
 }
 

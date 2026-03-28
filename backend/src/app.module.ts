@@ -44,6 +44,7 @@ import { PasskeyModule } from './passkey/passkey.module';
 import { SecurityModule } from './security/security.module';
 import { SandboxModule } from './sandbox/sandbox.module';
 import { MaintenanceModule } from './maintenance/maintenance.module';
+import { MaintenanceWindowMiddleware } from './maintenance/middleware/maintenance-window.middleware';
 
 // TODO: Enable Sentry when @sentry/nestjs module is compatible
 // import { SentryModule } from '@sentry/nestjs';
@@ -236,6 +237,7 @@ export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {
     consumer.apply(CorrelationIdMiddleware).forRoutes('*');
     consumer.apply(MaintenanceModeMiddleware).forRoutes('*');
+    consumer.apply(MaintenanceWindowMiddleware).forRoutes('*');
     consumer.apply(SentryUserMiddleware).forRoutes('*');
     consumer.apply(SecurityHeadersMiddleware).forRoutes('*');
   }

@@ -21,6 +21,8 @@ export const WS_EVENTS = {
   NOTIFICATION_NEW: 'notification_new',
   RANK_CHANGED: 'rank_changed',
   SYSTEM_MESSAGE: 'system_message',
+  SYSTEM_MAINTENANCE_START: 'system_maintenance_start',
+  SYSTEM_MAINTENANCE_END: 'system_maintenance_end',
 } as const;
 
 const REDIS_WS_PREFIX = 'ws:connections:';
@@ -115,6 +117,18 @@ export class CheeseGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     this.server.to('admin').emit(event, data);
+    return Promise.resolve();
+  }
+
+  emitToAll(event: string, data: unknown): Promise<void> {
+    if (!this.server) {
+      this.logger.warn(
+        'WebSocket server is not ready; skipping global broadcast',
+      );
+      return Promise.resolve();
+    }
+
+    this.server.emit(event, data);
     return Promise.resolve();
   }
 
