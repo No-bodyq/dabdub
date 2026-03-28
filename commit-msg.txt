@@ -1,1 +1,2 @@
 feat(wallets): Stellar wallet provisioning module
+feat(transfers): internal @username payment module
