@@ -75,6 +75,7 @@ import { SecurityHeadersMiddleware } from './security/security-headers.middlewar
 import { ComplianceModule } from './compliance/compliance.module';
 import { DisputesModule } from './disputes/disputes.module';
 import { UsernameModule } from './username/username.module';
+import { GroupExpensesModule } from './group-expenses/group-expenses.module';
 import { SplitsModule } from './splits/splits.module';
 import { FeedbackModule } from './feedback/feedback.module';
 import { DeepLinkModule } from './deeplink/deeplink.module';
@@ -233,6 +234,8 @@ import { FeatureFlagModule } from './feature-flags/feature-flag.module';
     UsernameModule,
 
 
+    // Group expenses — shared expenses inside group conversations.
+    GroupExpensesModule,
     // Splits — split payment requests among multiple users.
     SplitsModule,
     FeedbackModule,
