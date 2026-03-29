@@ -74,6 +74,7 @@ import { DisputesModule } from './disputes/disputes.module';
 import { UsernameModule } from './username/username.module';
 import { SplitsModule } from './splits/splits.module';
 import { FeedbackModule } from './feedback/feedback.module';
+import { FeesModule } from './fees/fees.module';
 
 @Module({
   imports: [
@@ -223,11 +224,10 @@ import { FeedbackModule } from './feedback/feedback.module';
     DisputesModule,
     UsernameModule,
 
-
     // Splits — split payment requests among multiple users.
     SplitsModule,
     FeedbackModule,
-
+    FeesModule,
   ],
 
   providers: [
