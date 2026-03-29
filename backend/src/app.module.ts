@@ -60,6 +60,8 @@ import { ReportsModule } from './reports/reports.module';
 import { WalletsModule } from './wallets/wallets.module';
 import { BlockchainTransactionsModule } from './blockchain-transactions/blockchain-transactions.module';
 import { ApiVersionModule } from './api-version/api-version.module';
+import { OffRampModule } from './offramp/offramp.module';
+import { OtpModule } from './otp/otp.module';
 import { DeprecationHeadersInterceptor } from './api-version/deprecation-headers.interceptor';
 import { CronModule } from './cron/cron.module';
 import { ActivityModule } from './activity/activity.module';
@@ -208,6 +210,8 @@ import { FeedbackModule } from './feedback/feedback.module';
     // Reports — async CSV data exports via BullMQ + R2.
     ReportsModule,
 
+    // Off-Ramp — USDC to NGN conversion and bank transfer.
+    OffRampModule,
     // Activity — chronological feed with cursor pagination, summary, and breakdown.
     ActivityModule,
     // Balance — unified balance aggregation with caching.
