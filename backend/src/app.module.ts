@@ -80,6 +80,7 @@ import { FeesModule } from './fees/fees.module';
 import { DeepLinkModule } from './deeplink/deeplink.module';
 import { FlutterwaveModule } from './flutterwave/flutterwave.module';
 import { FeatureFlagModule } from './feature-flags/feature-flag.module';
+import { BulkPaymentModule } from './bulk-payments/bulk-payment.module';
 import { PayoutsModule } from './payouts/payouts.module';
 import { GeoModule } from './geo/geo.module';
 import { GeoBlockMiddleware } from './geo/geo-block.middleware';
@@ -166,6 +167,7 @@ import { GeoBlockMiddleware } from './geo/geo-block.middleware';
     UsersModule,
     PinModule,
     TransfersModule,
+    BulkPaymentModule,
     WithdrawalsModule,
     SecurityModule,
     SandboxModule,
