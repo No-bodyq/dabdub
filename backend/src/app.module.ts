@@ -50,8 +50,7 @@ import { MaintenanceModule } from './maintenance/maintenance.module';
 import { MaintenanceWindowMiddleware } from './maintenance/middleware/maintenance-window.middleware';
 
 // TODO: Enable Sentry when @sentry/nestjs module is compatible
-// import { SentryModule } from '@sentry/nestjs';
-import { AlertModule } from './alert/alert.module';
+// import { SentryModule } from '@nestjs/nestjs';
 import { GroupsModule } from './groups/groups.module';
 import { TransactionsModule } from './transactions/transactions.module';
 import { PushModule } from './push/push.module';
@@ -74,12 +73,16 @@ import { SecurityHeadersMiddleware } from './security/security-headers.middlewar
 import { ComplianceModule } from './compliance/compliance.module';
 import { DisputesModule } from './disputes/disputes.module';
 import { UsernameModule } from './username/username.module';
+import { GroupExpensesModule } from './group-expenses/group-expenses.module';
 import { SplitsModule } from './splits/splits.module';
 import { FeedbackModule } from './feedback/feedback.module';
 import { FeesModule } from './fees/fees.module';
 import { DeepLinkModule } from './deeplink/deeplink.module';
 import { FlutterwaveModule } from './flutterwave/flutterwave.module';
 import { FeatureFlagModule } from './feature-flags/feature-flag.module';
+import { SearchModule } from './search/search.module';
+import { BulkPaymentModule } from './bulk-payments/bulk-payment.module';
+import { PayoutsModule } from './payouts/payouts.module';
 import { GeoModule } from './geo/geo.module';
 import { GeoBlockMiddleware } from './geo/geo-block.middleware';
 import { ReceiptModule } from './receipt/receipt.module';
@@ -166,12 +169,12 @@ import { ReceiptModule } from './receipt/receipt.module';
     UsersModule,
     PinModule,
     TransfersModule,
+    BulkPaymentModule,
     WithdrawalsModule,
     SecurityModule,
     SandboxModule,
     FeatureFlagsModule,
     MaintenanceModule,
-    AlertModule,
     GroupsModule,
     BankAccountsModule,
     VirtualAccountModule,
@@ -252,6 +255,10 @@ import { ReceiptModule } from './receipt/receipt.module';
 
     // Receipts — on-demand PDF receipt generation + R2 storage + email delivery.
     ReceiptModule,
+    PayoutsModule,
+
+    // Global search — users, transactions, paylinks.
+    SearchModule,
 
   ],
 
