@@ -42,6 +42,7 @@ process.env.WEBAUTHN_RP_ID = 'localhost';
 process.env.WEBAUTHN_ORIGIN = 'http://localhost:3000';
 process.env.WALLET_ENCRYPTION_KEY = 'test-wallet-encryption-key-32chars!!';
 
+// Required by AppConfigModule Joi schema when any import pulls in `src/config` barrel (e.g. via redis.module).
 process.env.BULL_BOARD_USERNAME = 'test-bull-board';
 process.env.BULL_BOARD_PASSWORD = 'test-bull-board-secret';
 process.env.STELLAR_RECEIVE_ADDRESS =
