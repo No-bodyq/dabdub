@@ -8,9 +8,15 @@ import { MerchantPosService } from './merchant-pos.service';
 import { MerchantsAdminController } from './merchants-admin.controller';
 import { MerchantsController } from './merchants.controller';
 import { MerchantsService } from './merchants.service';
+import { MerchantAnalyticsModule } from './analytics/merchant-analytics.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Merchant, User]), NotificationsModule, QrModule],
+  imports: [
+    TypeOrmModule.forFeature([Merchant, User]),
+    NotificationsModule,
+    QrModule,
+    MerchantAnalyticsModule,
+  ],
   controllers: [MerchantsController, MerchantsAdminController],
   providers: [MerchantsService, MerchantPosService],
   exports: [MerchantsService, MerchantPosService],

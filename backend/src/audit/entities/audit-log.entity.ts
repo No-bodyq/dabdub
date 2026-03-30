@@ -12,10 +12,26 @@ export enum ActorType {
   SYSTEM = 'system',
 }
 
+export enum SessionType {
+  ADMIN_DIRECT = 'admin_direct',
+  IMPERSONATION = 'impersonation',
+  API_KEY = 'api_key',
+  SYSTEM = 'system',
+}
+
+export enum RiskLevel {
+  LOW = 'low',
+  MEDIUM = 'medium',
+  HIGH = 'high',
+  CRITICAL = 'critical',
+}
+
 @Entity('audit_logs')
 @Index(['resourceType', 'resourceId', 'createdAt'])
 @Index(['actorId', 'createdAt'])
 @Index(['action', 'createdAt'])
+@Index(['impersonationSessionId', 'createdAt'])
+@Index(['riskLevel', 'createdAt'])
 export class AuditLog {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
@@ -53,6 +69,26 @@ export class AuditLog {
 
   @Column({ name: 'correlation_id', type: 'varchar', length: 255, nullable: true, default: null })
   correlationId!: string | null;
+
+  /** SHA-256 hash for tamper-evident chain */
+  @Column({ type: 'varchar', length: 64 })
+  hash!: string;
+
+  /** Hash of the immediately preceding AuditLog entry */
+  @Column({ name: 'previous_hash', type: 'varchar', length: 64, nullable: true, default: null })
+  previousHash!: string | null;
+
+  /** Type of session that generated this audit log */
+  @Column({ name: 'session_type', type: 'enum', enum: SessionType, default: SessionType.ADMIN_DIRECT })
+  sessionType!: SessionType;
+
+  /** UUID of impersonation session if sessionType is IMPERSONATION */
+  @Column({ name: 'impersonation_session_id', type: 'uuid', nullable: true, default: null })
+  impersonationSessionId!: string | null;
+
+  /** Risk level of the action */
+  @Column({ name: 'risk_level', type: 'enum', enum: RiskLevel, default: RiskLevel.LOW })
+  riskLevel!: RiskLevel;
 
   /** Immutable — no updatedAt */
   @CreateDateColumn({ name: 'created_at' })
