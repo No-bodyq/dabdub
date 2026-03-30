@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   HttpCode,
   HttpStatus,
@@ -20,6 +21,8 @@ import {
 } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { Public } from '../auth/decorators/public.decorator';
+import { ApiKeyOrJwtAuthGuard } from '../auth/guards/api-key-or-jwt-auth.guard';
+import { ApiPermission } from '../apikey/entities/ApiKey';
 import { User } from '../users/entities/user.entity';
 import { CreatePayLinkDto } from './dto/create-pay-link.dto';
 import { ListPayLinksQueryDto } from './dto/list-pay-links-query.dto';
@@ -30,11 +33,12 @@ import { PayLinkService } from './paylink.service';
 import { RequirePin } from '../pin/decorators/require-pin.decorator';
 import { PinGuard } from '../pin/guards/pin.guard';
 
-type AuthenticatedRequest = Request & { user: User };
+type AuthenticatedRequest = Request & { user: User & { isMerchantApiRequest?: boolean; apiKey?: any } };
 
 @ApiTags('paylinks')
 @ApiBearerAuth()
 @Controller({ path: 'paylinks', version: '1' })
+@UseGuards(ApiKeyOrJwtAuthGuard)
 export class PayLinkController {
   constructor(private readonly payLinkService: PayLinkService) {}
 
@@ -45,6 +49,9 @@ export class PayLinkController {
     @Req() req: AuthenticatedRequest,
     @Body() dto: CreatePayLinkDto,
   ): Promise<PayLink> {
+    if ((req.user as any)?.isMerchantApiRequest && !(req.user as any).apiKey.permissions.includes(ApiPermission.PAYLINKS_CREATE)) {
+      throw new ForbiddenException('API key does not have paylinks.create permission');
+    }
     return this.payLinkService.create(req.user, dto);
   }
 

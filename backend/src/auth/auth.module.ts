@@ -15,6 +15,8 @@ import { BiometricAuthController } from './biometric-auth.controller';
 import { BiometricAuthService } from './biometric-auth.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { ApiKeyGuard } from './guards/api-key.guard';
+import { ApiKeyOrJwtAuthGuard } from './guards/api-key-or-jwt-auth.guard';
 import { GeoModule } from '../geo/geo.module';
 import { TrustedDevice } from '../security/entities/trusted-device.entity';
 import { CustomThrottlerGuard } from '../common/guards/custom-throttler.guard';
@@ -45,6 +47,8 @@ import { CustomThrottlerGuard } from '../common/guards/custom-throttler.guard';
     BiometricAuthService,
     JwtStrategy,
     JwtAuthGuard,
+    ApiKeyGuard,
+    ApiKeyOrJwtAuthGuard,
     CustomThrottlerGuard,
   ],
   exports: [JwtAuthGuard, AuthService, BiometricAuthService, JwtStrategy],

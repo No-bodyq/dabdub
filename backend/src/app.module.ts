@@ -46,6 +46,7 @@ import { PasskeyModule } from './passkey/passkey.module';
 import { SecurityModule } from './security/security.module';
 import { SandboxModule } from './sandbox/sandbox.module';
 import { FeatureFlagsModule } from './feature-flags/feature-flags.module';
+import { ApiKeyModule } from './apikey/apikey.module';
 import { MaintenanceModule } from './maintenance/maintenance.module';
 import { MaintenanceWindowMiddleware } from './maintenance/middleware/maintenance-window.middleware';
 
@@ -256,6 +257,18 @@ import { StakingModule } from './staking/staking.module';
     // User-level feature flags (rollouts, A/B) — Redis-cached evaluation.
     FeatureFlagModule,
     GeoModule,
+
+    // Api key management and API-key-based endpoints.
+    // Must come before PayLinkModule to avoid route ambiguity for /paylinks.
+    // (ApiKey guarded paths are in explicit controllers/services.)
+    // See `src/apikey`.
+    //
+    // Order not critical; included for proper module registration.
+    
+    // TODO: keep as first to avoid path collisions.
+    // `ApiKeyModule` exports ApiKeyService and ApiKeyGuard.
+    // The PayLink routes are in PayLinkModule.
+    ApiKeyModule,
 
     // Receipts — on-demand PDF receipt generation + R2 storage + email delivery.
     ReceiptModule,
