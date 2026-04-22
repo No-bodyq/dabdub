@@ -1,8 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { HealthIndicator, HealthIndicatorResult, HealthCheckError } from '@nestjs/terminus';
+import {
+  HealthIndicator,
+  HealthIndicatorResult,
+  HealthCheckError,
+} from '@nestjs/terminus';
 import { Inject } from '@nestjs/common';
 import { stellarConfig } from '../config';
 import type { StellarConfig } from '../config';
+import { traceAsyncOperation } from '../telemetry/telemetry';
 
 /** Milliseconds before the Stellar RPC call is considered timed out. */
 const STELLAR_TIMEOUT_MS = 5_000;
@@ -37,37 +42,46 @@ export class StellarHealthIndicator extends HealthIndicator {
    * Network errors and non-2xx responses surface as HealthCheckError.
    */
   async pingCheck(key: string): Promise<HealthIndicatorResult> {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), STELLAR_TIMEOUT_MS);
+    return traceAsyncOperation(
+      'health.stellar.ping',
+      {
+        'health.component': key,
+        'stellar.rpc_url': this.cfg.rpcUrl,
+      },
+      async () => {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), STELLAR_TIMEOUT_MS);
 
-    try {
-      const response = await fetch(this.feeStatsUrl, {
-        method: 'GET',
-        signal: controller.signal,
-        headers: { Accept: 'application/json' },
-      });
+        try {
+          const response = await fetch(this.feeStatsUrl, {
+            method: 'GET',
+            signal: controller.signal,
+            headers: { Accept: 'application/json' },
+          });
 
-      if (!response.ok) {
-        throw new Error(
-          `HTTP ${response.status} ${response.statusText} from ${this.feeStatsUrl}`,
-        );
-      }
+          if (!response.ok) {
+            throw new Error(
+              `HTTP ${response.status} ${response.statusText} from ${this.feeStatsUrl}`,
+            );
+          }
 
-      return this.getStatus(key, true);
-    } catch (err) {
-      const message =
-        err instanceof Error
-          ? err.name === 'AbortError'
-            ? `Timed out after ${STELLAR_TIMEOUT_MS} ms`
-            : err.message
-          : String(err);
+          return this.getStatus(key, true);
+        } catch (err) {
+          const message =
+            err instanceof Error
+              ? err.name === 'AbortError'
+                ? `Timed out after ${STELLAR_TIMEOUT_MS} ms`
+                : err.message
+              : String(err);
 
-      this.logger.warn(`Stellar health check failed: ${message}`);
+          this.logger.warn(`Stellar health check failed: ${message}`);
 
-      const result = this.getStatus(key, false, { message });
-      throw new HealthCheckError(`${key} is down`, result);
-    } finally {
-      clearTimeout(timer);
-    }
+          const result = this.getStatus(key, false, { message });
+          throw new HealthCheckError(`${key} is down`, result);
+        } finally {
+          clearTimeout(timer);
+        }
+      },
+    );
   }
 }

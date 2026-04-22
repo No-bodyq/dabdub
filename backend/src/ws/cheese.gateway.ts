@@ -12,6 +12,7 @@ import Redis from 'ioredis';
 import { jwtConfig } from '../config/jwt.config';
 import { redisConfig } from '../config/redis.config';
 import type { JwtPayload } from '../auth/auth.service';
+import { traceAsyncOperation } from '../telemetry/telemetry';
 
 export const WS_EVENTS = {
   TRANSFER_SENT: 'transfer_sent',
@@ -57,43 +58,70 @@ export class CheeseGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   async handleConnection(client: Socket): Promise<void> {
-    const token: string | undefined = client.handshake.auth?.token;
+    await traceAsyncOperation(
+      'ws.handle_connection',
+      {
+        'socket.id': client.id,
+      },
+      async () => {
+        const token =
+          typeof client.handshake.auth?.token === 'string'
+            ? client.handshake.auth.token
+            : undefined;
 
-    if (!token) {
-      client.disconnect();
-      return;
-    }
+        if (!token) {
+          client.disconnect();
+          return;
+        }
 
-    let payload: JwtPayload;
-    try {
-      payload = this.jwtService.verify<JwtPayload>(token, {
-        secret: this.jwt.accessSecret,
-      });
-    } catch {
-      client.disconnect();
-      return;
-    }
+        let payload: JwtPayload;
+        try {
+          payload = this.jwtService.verify<JwtPayload>(token, {
+            secret: this.jwt.accessSecret,
+          });
+        } catch {
+          client.disconnect();
+          return;
+        }
 
-    const userRoom = `user:${payload.sub}`;
-    await client.join(userRoom);
-    await this.redis.hset(`${REDIS_WS_PREFIX}${payload.sub}`, client.id, '1');
+        const userRoom = `user:${payload.sub}`;
+        await client.join(userRoom);
+        await this.redis.hset(
+          `${REDIS_WS_PREFIX}${payload.sub}`,
+          client.id,
+          '1',
+        );
 
-    if (payload.role === 'admin') {
-      await client.join('admin');
-    }
+        if (payload.role === 'admin') {
+          await client.join('admin');
+        }
 
-    (client as Socket & { userId: string }).userId = payload.sub;
-    this.logger.debug(`Client ${client.id} joined room ${userRoom}`);
+        (client as Socket & { userId: string }).userId = payload.sub;
+        this.logger.debug(`Client ${client.id} joined room ${userRoom}`);
+      },
+    );
   }
 
   async handleDisconnect(client: Socket): Promise<void> {
-    const userId = (client as Socket & { userId?: string }).userId;
-    if (userId) {
-      await this.redis.hdel(`${REDIS_WS_PREFIX}${userId}`, client.id);
-    }
+    await traceAsyncOperation(
+      'ws.handle_disconnect',
+      {
+        'socket.id': client.id,
+      },
+      async () => {
+        const userId = (client as Socket & { userId?: string }).userId;
+        if (userId) {
+          await this.redis.hdel(`${REDIS_WS_PREFIX}${userId}`, client.id);
+        }
+      },
+    );
   }
 
-  async emitToUser(userId: string, event: string, data: unknown): Promise<void> {
+  async emitToUser(
+    userId: string,
+    event: string,
+    data: unknown,
+  ): Promise<void> {
     const sockets = await this.redis.hkeys(`${REDIS_WS_PREFIX}${userId}`);
     if (sockets.length === 0) return;
     this.server.to(`user:${userId}`).emit(event, data);

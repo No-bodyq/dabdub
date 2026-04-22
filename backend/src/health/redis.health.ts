@@ -1,8 +1,13 @@
 import { Injectable, Logger, Inject } from '@nestjs/common';
-import { HealthIndicator, HealthIndicatorResult, HealthCheckError } from '@nestjs/terminus';
+import {
+  HealthIndicator,
+  HealthIndicatorResult,
+  HealthCheckError,
+} from '@nestjs/terminus';
 import Redis from 'ioredis';
 import { redisConfig } from '../config';
 import type { RedisConfig } from '../config';
+import { traceAsyncOperation } from '../telemetry/telemetry';
 
 /**
  * RedisHealthIndicator pings Redis using ioredis and reports the result
@@ -46,24 +51,34 @@ export class RedisHealthIndicator extends HealthIndicator {
    * Throws HealthCheckError (which Terminus catches) on failure.
    */
   async pingCheck(key: string): Promise<HealthIndicatorResult> {
-    try {
-      // Connect lazily; if already connected this is a no-op.
-      if (this.client.status === 'wait' || this.client.status === 'close') {
-        await this.client.connect();
-      }
+    return traceAsyncOperation(
+      'health.redis.ping',
+      {
+        'health.component': key,
+        'redis.host': this.cfg.host,
+        'redis.port': this.cfg.port,
+      },
+      async () => {
+        try {
+          // Connect lazily; if already connected this is a no-op.
+          if (this.client.status === 'wait' || this.client.status === 'close') {
+            await this.client.connect();
+          }
 
-      const reply = await this.client.ping();
+          const reply = await this.client.ping();
 
-      if (reply !== 'PONG') {
-        throw new Error(`Unexpected PING reply: ${reply}`);
-      }
+          if (reply !== 'PONG') {
+            throw new Error(`Unexpected PING reply: ${String(reply)}`);
+          }
 
-      return this.getStatus(key, true);
-    } catch (err) {
-      const result = this.getStatus(key, false, {
-        message: err instanceof Error ? err.message : String(err),
-      });
-      throw new HealthCheckError(`${key} is down`, result);
-    }
+          return this.getStatus(key, true);
+        } catch (err) {
+          const result = this.getStatus(key, false, {
+            message: err instanceof Error ? err.message : String(err),
+          });
+          throw new HealthCheckError(`${key} is down`, result);
+        }
+      },
+    );
   }
 }

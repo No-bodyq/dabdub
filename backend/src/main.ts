@@ -3,10 +3,17 @@ import { ValidationPipe, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
-import type { AppConfig } from './config';
+import {
+  telemetryConfig,
+  type AppConfig,
+  type TelemetryConfig,
+} from './config';
+import { shutdownTelemetry, startTelemetry } from './telemetry/telemetry';
 
 async function bootstrap(): Promise<void> {
   const logger = new Logger('Bootstrap');
+  const telemetry = telemetryConfig() as unknown as () => TelemetryConfig;
+  startTelemetry(telemetry());
   const app = await NestFactory.create(AppModule, {
     logger: ['error', 'warn', 'log', 'debug', 'verbose'],
   });
@@ -35,9 +42,13 @@ async function bootstrap(): Promise<void> {
   const document = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup(`${apiPrefix}/docs`, app, document);
 
+  process.once('SIGTERM', () => {
+    void shutdownTelemetry();
+  });
+
   await app.listen(port);
   logger.log(`Application running on http://localhost:${port}/${apiPrefix}`);
   logger.log(`Swagger docs at http://localhost:${port}/${apiPrefix}/docs`);
 }
 
-bootstrap();
+void bootstrap();
