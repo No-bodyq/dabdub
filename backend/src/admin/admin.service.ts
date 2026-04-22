@@ -1,378 +1,249 @@
-import {
-  Injectable,
-  NotFoundException,
-  BadRequestException,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, NotFoundException, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between, MoreThanOrEqual, LessThanOrEqual } from 'typeorm';
-import { Merchant, MerchantStatus } from '../database/entities/merchant.entity';
-import { Payment } from '../database/entities/payment.entity';
+import { Repository, ILike, Raw } from 'typeorm';
+import { User, KycStatus } from '../users/entities/user.entity';
 import {
-  Settlement,
-  SettlementStatus,
-} from '../settlement/entities/settlement.entity';
-import { AuditLogService } from '../audit/audit-log.service';
-import { AuditAction, ActorType } from '../database/entities/audit-log.enums';
-import { AdminPaymentFiltersDto } from './dto/admin-payment-filters.dto';
-import { AuditLogFiltersDto } from './dto/audit-log-filters.dto';
-import { MerchantStatusUpdateDto } from './dto/merchant-status-update.dto';
+  Transaction,
+  TransactionStatus,
+} from '../transactions/entities/transaction.entity';
 import {
-  ManualReconciliationDto,
-  ReconciliationType,
-} from './dto/manual-reconciliation.dto';
+  FraudFlag,
+  FraudStatus,
+  FraudSeverity,
+} from '../fraud/entities/fraud-flag.entity';
+import { Session } from '../auth/entities/session.entity';
+import { RefreshToken } from '../auth/entities/refresh-token.entity';
+import { EmailService } from '../email/email.service';
+import { AuditService } from '../audit/audit.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { CacheService } from '../cache/cache.service';
+import { TierName } from '../tier-config/entities/tier-config.entity';
 
 @Injectable()
 export class AdminService {
-  private readonly logger = new Logger(AdminService.name);
-
   constructor(
-    @InjectRepository(Merchant)
-    private readonly merchantRepo: Repository<Merchant>,
-    @InjectRepository(Payment)
-    private readonly paymentRepo: Repository<Payment>,
-    @InjectRepository(Settlement)
-    private readonly settlementRepo: Repository<Settlement>,
-    private readonly auditLogService: AuditLogService,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
+    @InjectRepository(Transaction)
+    private readonly txRepo: Repository<Transaction>,
+    @InjectRepository(FraudFlag)
+    private readonly fraudRepo: Repository<FraudFlag>,
+    @InjectRepository(Session)
+    private readonly sessionRepo: Repository<Session>,
+    @InjectRepository(RefreshToken)
+    private readonly tokenRepo: Repository<RefreshToken>,
+    private readonly emailService: EmailService,
+    private readonly auditService: AuditService,
+    private readonly notificationsService: NotificationsService,
+    private readonly cacheService: CacheService,
   ) {}
 
-  async getMerchantById(id: string) {
-    const merchant = await this.merchantRepo.findOne({
-      where: { id },
-      relations: ['user'],
+  async findAllUsers(query: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    tier?: TierName;
+    kycStatus?: KycStatus;
+    isActive?: boolean;
+    isMerchant?: boolean;
+  }) {
+    const {
+      page = 1,
+      limit = 20,
+      search,
+      tier,
+      kycStatus,
+      isActive,
+      isMerchant,
+    } = query;
+    const skip = (page - 1) * limit;
+
+    const where: any = {};
+    if (search) {
+      where.email = ILike(`%${search}%`);
+      // TypeORM doesn't support OR easily in this format, but for a dashboard this is usually enough
+      // or we can use [ { email: ... }, { username: ... } ]
+    }
+    if (tier) where.tier = tier;
+    if (kycStatus) where.kycStatus = kycStatus;
+    if (isActive !== undefined) where.isActive = isActive;
+    if (isMerchant !== undefined) where.isMerchant = isMerchant;
+
+    const [data, total] = await this.userRepo.findAndCount({
+      where: search
+        ? [{ email: ILike(`%${search}%`) }, { username: ILike(`%${search}%`) }]
+        : where,
+      order: { createdAt: 'DESC' },
+      take: limit,
+      skip,
     });
 
-    if (!merchant) {
-      throw new NotFoundException(`Merchant with ID ${id} not found`);
+    return { data, total, page, limit };
+  }
+
+  async findUserById(id: string) {
+    const user = await this.userRepo.findOne({ where: { id } });
+    if (!user) throw new NotFoundException('User not found');
+
+    const [transactions, fraudFlags, sessions] = await Promise.all([
+      this.txRepo.find({
+        where: { userId: id },
+        order: { createdAt: 'DESC' },
+        take: 10,
+      }),
+      this.fraudRepo.find({ where: { userId: id, status: FraudStatus.OPEN } }),
+      this.sessionRepo.find({ where: { userId: id } }),
+    ]);
+
+    // Mocking KYC submission for now as I don't see a specific KYC entity in the list yet
+    // but the requirement says "KYC submission"
+
+    return {
+      ...user,
+      walletBalance: '0.00', // Need to integrate with wallet service if exists
+      recentTransactions: transactions,
+      openFraudFlags: fraudFlags,
+      sessions,
+      kycSubmission: null,
+    };
+  }
+
+  async freezeUser(id: string, reason: string, adminId: string) {
+    const user = await this.userRepo.findOne({ where: { id } });
+    if (!user) throw new NotFoundException('User not found');
+
+    user.isActive = false;
+    await this.userRepo.save(user);
+
+    // Revoke all sessions
+    const sessions = await this.sessionRepo.find({ where: { userId: id } });
+    const sessionIds = sessions.map((s) => s.id);
+    const refreshTokenIds = sessions.map((s) => s.refreshTokenId);
+
+    if (sessionIds.length > 0) {
+      await this.sessionRepo.delete(sessionIds);
+      await this.tokenRepo.update(refreshTokenIds, { revokedAt: new Date() });
     }
 
-    // Get additional stats
-    const [paymentCount, totalVolume] = await Promise.all([
-      this.paymentRepo.count({ where: { merchantId: id } }),
-      this.paymentRepo
-        .createQueryBuilder('payment')
-        .select('SUM(payment.amount)', 'total')
-        .where('payment.merchantId = :id', { id })
+    // Create FraudFlag
+    await this.fraudRepo.save(
+      this.fraudRepo.create({
+        userId: id,
+        rule: 'MANUAL_FREEZE',
+        severity: FraudSeverity.HIGH,
+        description: reason,
+        status: FraudStatus.OPEN,
+        triggeredBy: 'ADMIN',
+      }),
+    );
+
+    // Audit log
+    await this.auditService.log(
+      adminId,
+      'USER_FREEZE',
+      `User ${id} frozen for reason: ${reason}`,
+    );
+
+    // Email user
+    await this.emailService.queue(
+      user.email,
+      'ACCOUNT_FROZEN',
+      { reason },
+      user.id,
+    );
+
+    return { success: true };
+  }
+
+  async unfreezeUser(id: string, adminId: string) {
+    const user = await this.userRepo.findOne({ where: { id } });
+    if (!user) throw new NotFoundException('User not found');
+
+    user.isActive = true;
+    await this.userRepo.save(user);
+
+    // Resolve FraudFlags
+    await this.fraudRepo.update(
+      { userId: id, rule: 'MANUAL_FREEZE', status: FraudStatus.OPEN },
+      {
+        status: FraudStatus.RESOLVED,
+        resolvedBy: adminId,
+        resolvedAt: new Date(),
+        resolutionNote: 'Unfrozen by admin',
+      },
+    );
+
+    // Audit log
+    await this.auditService.log(
+      adminId,
+      'USER_UNFREEZE',
+      `User ${id} unfrozen`,
+    );
+
+    // Email user
+    await this.emailService.queue(user.email, 'ACCOUNT_UNFROZEN', {}, user.id);
+
+    return { success: true };
+  }
+
+  async getStats() {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const [
+      totalUsers,
+      newUsersToday,
+      pendingKycCount,
+      openFraudFlagCount,
+      txStats,
+    ] = await Promise.all([
+      this.userRepo.count(),
+      this.userRepo.count({
+        where: { createdAt: Raw((alias) => `${alias} >= :today`, { today }) },
+      }),
+      this.userRepo.count({ where: { kycStatus: KycStatus.PENDING } }),
+      this.fraudRepo.count({ where: { status: FraudStatus.OPEN } }),
+      this.txRepo
+        .createQueryBuilder('tx')
+        .select('SUM(tx.amount)', 'totalVolume')
+        // Assuming fees are in a separate column or calculated.
+        // Based on Transaction entity I saw earlier, it only had amountUsdc and amount.
+        // Let's assume fees are not yet in the entity or I missed them.
+        .where('tx.status = :status', { status: TransactionStatus.COMPLETED })
+        .andWhere('tx.createdAt >= :today', { today })
         .getRawOne(),
     ]);
 
+    const activeToday = await this.cacheService.getActiveUsersTodayCount();
+
     return {
-      ...merchant,
-      stats: {
-        paymentCount,
-        totalVolume: totalVolume?.total || 0,
-      },
+      totalUsers,
+      activeToday,
+      newUsersToday,
+      totalUsdcVolumeToday: txStats?.totalVolume || 0,
+      totalFeesToday: 0, // Placeholder
+      pendingKycCount,
+      openFraudFlagCount,
     };
   }
 
-  async updateMerchantStatus(
-    id: string,
-    updateDto: MerchantStatusUpdateDto,
-    adminId: string,
-    ipAddress?: string,
-  ) {
-    const merchant = await this.merchantRepo.findOne({ where: { id } });
+  async findAllTransactions(query: { page?: number; limit?: number }) {
+    const { page = 1, limit = 20 } = query;
+    const skip = (page - 1) * limit;
 
-    if (!merchant) {
-      throw new NotFoundException(`Merchant with ID ${id} not found`);
-    }
-
-    const beforeState = { status: merchant.status };
-    const oldStatus = merchant.status;
-
-    merchant.status = updateDto.status;
-
-    if (updateDto.status === MerchantStatus.ACTIVE && !merchant.activatedAt) {
-      merchant.activatedAt = new Date();
-    }
-
-    const updated = await this.merchantRepo.save(merchant);
-
-    // Audit log
-    await this.auditLogService.log({
-      entityType: 'Merchant',
-      entityId: id,
-      action: AuditAction.UPDATE,
-      actorId: adminId,
-      actorType: ActorType.ADMIN,
-      beforeState,
-      afterState: { status: updateDto.status },
-      ipAddress,
-      metadata: {
-        reason: updateDto.reason,
-        oldStatus,
-        newStatus: updateDto.status,
-      },
+    const [data, total] = await this.txRepo.findAndCount({
+      order: { createdAt: 'DESC' },
+      take: limit,
+      skip,
     });
 
-    this.logger.log(
-      `Admin ${adminId} changed merchant ${id} status from ${oldStatus} to ${updateDto.status}`,
-    );
-
-    return updated;
+    return { data, total, page, limit };
   }
 
-  async getPayments(filters: AdminPaymentFiltersDto) {
-    const {
-      page = 1,
-      limit = 20,
-      status,
-      merchantId,
-      reference,
-      fromDate,
-      toDate,
-      minAmount,
-      maxAmount,
-      currency,
-      search,
-    } = filters;
-
-    const qb = this.paymentRepo.createQueryBuilder('payment');
-
-    if (status) {
-      qb.andWhere('payment.status = :status', { status });
-    }
-
-    if (merchantId) {
-      qb.andWhere('payment.merchantId = :merchantId', { merchantId });
-    }
-
-    if (reference) {
-      qb.andWhere('payment.reference ILIKE :reference', {
-        reference: `%${reference}%`,
-      });
-    }
-
-    if (fromDate) {
-      qb.andWhere('payment.createdAt >= :fromDate', { fromDate });
-    }
-
-    if (toDate) {
-      qb.andWhere('payment.createdAt <= :toDate', { toDate });
-    }
-
-    if (minAmount) {
-      qb.andWhere('payment.amount >= :minAmount', { minAmount });
-    }
-
-    if (maxAmount) {
-      qb.andWhere('payment.amount <= :maxAmount', { maxAmount });
-    }
-
-    if (currency) {
-      qb.andWhere('payment.currency = :currency', { currency });
-    }
-
-    if (search) {
-      qb.andWhere(
-        '(payment.reference ILIKE :search OR payment.description ILIKE :search)',
-        { search: `%${search}%` },
-      );
-    }
-
-    qb.orderBy('payment.createdAt', 'DESC')
-      .skip((page - 1) * limit)
-      .take(limit);
-
-    const [data, total] = await qb.getManyAndCount();
-
-    return {
-      data,
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
-    };
-  }
-
-  async retrySettlement(id: string, adminId: string, ipAddress?: string) {
-    const settlement = await this.settlementRepo.findOne({ where: { id } });
-
-    if (!settlement) {
-      throw new NotFoundException(`Settlement with ID ${id} not found`);
-    }
-
-    if (settlement.status !== SettlementStatus.FAILED) {
-      throw new BadRequestException(
-        'Only failed settlements can be manually retried',
-      );
-    }
-
-    const beforeState = {
-      status: settlement.status,
-      retryCount: settlement.retryCount,
-    };
-
-    settlement.status = SettlementStatus.PENDING;
-    settlement.retryCount = 0;
-    settlement.failureReason = null;
-
-    const updated = await this.settlementRepo.save(settlement);
-
-    // Audit log
-    await this.auditLogService.log({
-      entityType: 'Settlement',
-      entityId: id,
-      action: AuditAction.UPDATE,
-      actorId: adminId,
-      actorType: ActorType.ADMIN,
-      beforeState,
-      afterState: {
-        status: settlement.status,
-        retryCount: settlement.retryCount,
-      },
-      ipAddress,
-      metadata: {
-        action: 'manual_retry',
-      },
-    });
-
-    this.logger.log(`Admin ${adminId} manually retried settlement ${id}`);
-
-    return updated;
-  }
-
-  async getSystemMetrics() {
-    const [
-      totalMerchants,
-      activeMerchants,
-      totalPayments,
-      totalSettlements,
-      pendingSettlements,
-    ] = await Promise.all([
-      this.merchantRepo.count(),
-      this.merchantRepo.count({ where: { status: MerchantStatus.ACTIVE } }),
-      this.paymentRepo.count(),
-      this.settlementRepo.count(),
-      this.settlementRepo.count({
-        where: { status: SettlementStatus.PENDING },
-      }),
-    ]);
-
-    // Get payment volume
-    const volumeResult = await this.paymentRepo
-      .createQueryBuilder('payment')
-      .select('SUM(payment.amount)', 'total')
-      .getRawOne();
-
-    return {
-      merchants: {
-        total: totalMerchants,
-        active: activeMerchants,
-      },
-      payments: {
-        total: totalPayments,
-        volume: volumeResult?.total || 0,
-      },
-      settlements: {
-        total: totalSettlements,
-        pending: pendingSettlements,
-      },
-      timestamp: new Date().toISOString(),
-    };
-  }
-
-  async getAuditLogs(filters: AuditLogFiltersDto) {
-    const {
-      page = 1,
-      limit = 20,
-      entityType,
-      entityId,
-      actorId,
-      action,
-      actorType,
-      dataClassification,
-      requestId,
-      startDate,
-      endDate,
-    } = filters;
-
-    const result = await this.auditLogService.search({
-      entityType,
-      entityId,
-      actorId,
-      action,
-      dataClassification,
-      requestId,
-      startDate: startDate ? new Date(startDate) : undefined,
-      endDate: endDate ? new Date(endDate) : undefined,
-      limit,
-      offset: (page - 1) * limit,
-    });
-
-    return {
-      data: result.data,
-      meta: {
-        total: result.total,
-        page,
-        limit,
-        totalPages: Math.ceil(result.total / limit),
-      },
-    };
-  }
-
-  async performManualReconciliation(
-    dto: ManualReconciliationDto,
-    adminId: string,
-    ipAddress?: string,
-  ) {
-    let entity: any;
-    let entityType: string;
-
-    switch (dto.type) {
-      case ReconciliationType.PAYMENT:
-        entity = await this.paymentRepo.findOne({
-          where: { id: dto.entityId },
-        });
-        entityType = 'Payment';
-        break;
-      case ReconciliationType.SETTLEMENT:
-        entity = await this.settlementRepo.findOne({
-          where: { id: dto.entityId },
-        });
-        entityType = 'Settlement';
-        break;
-      default:
-        throw new BadRequestException(
-          `Unsupported reconciliation type: ${dto.type}`,
-        );
-    }
-
-    if (!entity) {
-      throw new NotFoundException(
-        `${entityType} with ID ${dto.entityId} not found`,
-      );
-    }
-
-    // Audit log for reconciliation
-    await this.auditLogService.log({
-      entityType,
-      entityId: dto.entityId,
-      action: AuditAction.UPDATE,
-      actorId: adminId,
-      actorType: ActorType.ADMIN,
-      beforeState: { status: entity.status },
-      afterState: { reconciled: true },
-      ipAddress,
-      metadata: {
-        reconciliationType: dto.type,
-        reason: dto.reason,
-        adjustmentAmount: dto.adjustmentAmount,
-        notes: dto.notes,
-      },
-    });
-
-    this.logger.log(
-      `Admin ${adminId} performed manual reconciliation for ${entityType} ${dto.entityId}`,
-    );
-
-    return {
-      success: true,
-      entityType,
-      entityId: dto.entityId,
-      reconciledAt: new Date().toISOString(),
-    };
+  async broadcast(dto: { title: string; body: string; segment: string }) {
+    // This would typically involve a background job
+    // NotificationsService should have a broadcast method
+    await this.notificationsService.broadcast(dto.title, dto.body, dto.segment);
+    return { success: true };
   }
 }

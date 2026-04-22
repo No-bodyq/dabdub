@@ -1,43 +1,68 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { DatabaseHealthIndicator } from './health.indicator';
-import { GlobalConfigService } from '../config/global-config.service';
+import { ConfigType } from '@nestjs/config';
+import { databaseConfig, appConfig } from '../config';
+import { DatabaseMaintenanceService } from './database-maintenance.service';
 
+/**
+ * DatabaseModule owns the single TypeORM root connection.
+ *
+ * Rules enforced here:
+ *  - synchronize is always false — schema changes happen through migrations only.
+ *  - migrationsRun is true in production so the app self-migrates on startup.
+ *  - autoLoadEntities: true lets TypeOrmModule.forFeature() register entities
+ *    without duplicating glob patterns.
+ *
+ * Feature modules register their entities with:
+ *   TypeOrmModule.forFeature([SomeEntity, AnotherEntity])
+ *
+ * Import DatabaseModule once, in AppModule only.
+ */
 @Module({
   imports: [
     TypeOrmModule.forRootAsync({
-      inject: [GlobalConfigService],
-      useFactory: (config: GlobalConfigService) => {
-        const db = config.getDatabaseConfig();
-        const poolMax = db.poolSize;
-        const poolMin = Math.min(2, db.poolSize);
+      // Config tokens are globally provided by AppConfigModule (isGlobal: true).
+      inject: [databaseConfig.KEY, appConfig.KEY],
+      useFactory: (
+        db: ConfigType<typeof databaseConfig>,
+        app: ConfigType<typeof appConfig>,
+      ) => {
+        const isProd = app.nodeEnv === 'production';
+        const isDev = app.nodeEnv === 'development';
 
         return {
           type: 'postgres',
           host: db.host,
           port: db.port,
-          database: db.database,
-          username: db.username,
-          password: db.password,
-          ssl: config.isProduction() ? { rejectUnauthorized: false } : false,
-          entities: [__dirname + '/../**/*.entity{.ts,.js}'],
-          migrations: [__dirname + '/migrations/*{.ts,.js}'],
-          migrationsRun: config.isProduction(),
+          username: db.user,
+          password: db.pass,
+          database: db.name,
+
+          // autoLoadEntities picks up anything registered via forFeature().
+          // The dist glob below is the fallback for CLI / seed contexts.
+          autoLoadEntities: true,
+          entities: ['dist/**/*.entity.js'],
+
+          migrations: ['dist/database/migrations/*.js'],
+
+          // Never auto-sync — always use migrations.
           synchronize: false,
-          logging: config.isDevelopment() ? ['query', 'error'] : ['error'],
-          extra: {
-            max: poolMax,
-            min: poolMin,
-            idleTimeoutMillis: 30000,
-            connectionTimeoutMillis: 2000,
-          },
-          retryAttempts: 5,
-          retryDelay: 3000,
+
+          // Auto-run pending migrations only in production.
+          migrationsRun: isProd,
+
+          logging: isDev ? ['query', 'error', 'warn'] : ['error'],
+
+          // Log queries that exceed 1 second in non-production environments
+          maxQueryExecutionTime: isDev ? 1000 : undefined,
+
+          // Keeps TypeORM CLI aware of where to put generated migration files.
+          cli: { migrationsDir: 'src/database/migrations' },
         };
       },
     }),
   ],
-  providers: [DatabaseHealthIndicator],
-  exports: [DatabaseHealthIndicator],
+  providers: [DatabaseMaintenanceService],
+  exports: [DatabaseMaintenanceService],
 })
 export class DatabaseModule {}

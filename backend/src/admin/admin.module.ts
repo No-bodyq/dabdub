@@ -1,23 +1,35 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { AdminController } from './admin.controller';
+import { Admin } from './entities/admin.entity';
 import { AdminService } from './admin.service';
-import { MerchantsModule } from './merchants/merchants.module';
-import { HealthModule } from '../health/health.module';
+import { AdminController } from './admin.controller';
+import { User } from '../users/entities/user.entity';
+import { Transaction } from '../transactions/entities/transaction.entity';
+import { FraudFlag } from '../fraud/entities/fraud-flag.entity';
+import { Session } from '../auth/entities/session.entity';
+import { RefreshToken } from '../auth/entities/refresh-token.entity';
+import { EmailModule } from '../email/email.module';
+import { NotificationsModule } from '../notifications/notifications.module';
+import { AdminAuthModule } from './auth/admin-auth.module';
 import { AuditModule } from '../audit/audit.module';
-import { Merchant } from '../database/entities/merchant.entity';
-import { Payment } from '../database/entities/payment.entity';
-import { Settlement } from '../settlement/entities/settlement.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Merchant, Payment, Settlement]),
-    MerchantsModule,
-    HealthModule,
+    TypeOrmModule.forFeature([
+      Admin,
+      User,
+      Transaction,
+      FraudFlag,
+      Session,
+      RefreshToken,
+    ]),
+    EmailModule,
+    NotificationsModule,
+    AdminAuthModule,
     AuditModule,
   ],
-  controllers: [AdminController],
   providers: [AdminService],
-  exports: [AdminService],
+  controllers: [AdminController],
+  exports: [AdminService, AdminAuthModule],
 })
 export class AdminModule {}

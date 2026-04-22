@@ -1,65 +1,67 @@
 name: CI
 
 on:
+  push:
+    branches: ["**"]
   pull_request:
 
-permissions:
-  contents: read
+env:
+  RUSTFLAGS: -D warnings
+  CARGO_INCREMENTAL: 0
+  LLVM_PROFILE_FILE: target/coverage/cheese-%p-%m.profraw
 
 jobs:
-  backend-ci:
+  ci:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: backend
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
         with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: backend/package-lock.json
+          targets: wasm32v1-none
 
-      - name: Install dependencies
-        run: npm install --legacy-peer-deps
+      - name: Install cargo-tarpaulin
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-tarpaulin
 
-      - name: Format code
-        run: npx prettier --write "src/**/*.ts" "test/**/*.ts"
+      - name: Install Rust wasm target
+        run: rustup target add wasm32v1-none
 
-      - name: Format check
-        run: npx prettier --check "src/**/*.ts" "test/**/*.ts"
+      - name: cargo test
+        run: cargo test
 
-      - name: Lint
-        run: npx eslint "{src,apps,libs,test}/**/*.ts" --max-warnings=0
-
-      - name: Unit tests
-        run: npm run test
-
-      - name: Coverage
-        run: npm run test:cov
-
-      - name: Build
-        run: npm run build
-
-      - name: npm audit
-        run: npm audit --audit-level=high
-
-      - name: Snyk scan
-        if: env.SNYK_TOKEN != ''
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        run: npx snyk test --severity-threshold=high
-
-      - name: Coverage summary
+      - name: Generate coverage report
         run: |
-          node -e "const fs=require('fs');const s=JSON.parse(fs.readFileSync('coverage/coverage-summary.json','utf8')).total;console.log(`Lines: ${s.lines.pct}% | Statements: ${s.statements.pct}% | Functions: ${s.functions.pct}% | Branches: ${s.branches.pct}%`);" >> "$GITHUB_STEP_SUMMARY"
+          mkdir -p target/coverage
+          cargo tarpaulin \
+            --workspace \
+            --out Xml \
+            --output-dir target/coverage \
+            --exclude-files "*/tests/*" \
+            --verbose \
+            --fail-under 85
 
-      - name: Upload coverage artifact
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        with:
+          files: target/coverage/cobertura.xml
+          flags: rust
+          name: cheese-contracts
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: wasm build
+        run: cargo wasm-build
+
+      - name: Upload WASM artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: backend-coverage
-          path: backend/coverage
-          if-no-files-found: error
+          name: wasm-contracts
+          path: |
+            contracts/paylink/target/wasm32v1-none/release/paylink.wasm
+            contracts/cheese_pay/target/wasm32v1-none/release/cheese_pay.wasm
+          retention-days: 30

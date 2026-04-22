@@ -1,45 +1,15 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { BullModule } from '@nestjs/bull';
-import { MerchantIpAllowlist } from './entities/merchant-ip-allowlist.entity';
-import { SecurityEvent } from './entities/security-event.entity';
-import { IpBlock } from './entities/ip-block.entity';
-import { Merchant } from '../database/entities/merchant.entity';
-import { IpBlockService } from './services/ip-block.service';
-import { IpAllowlistService } from './services/ip-allowlist.service';
-import { SecurityEventService } from './services/security-event.service';
-import { IpExpiryProcessor } from './processors/ip-expiry.processor';
-import { MerchantIpAllowlistController } from './controllers/merchant-ip-allowlist.controller';
-import { SecurityController } from './controllers/security.controller';
-import { RedisModule } from '../common/redis';
+import { SecurityService } from './security.service';
+import { SecurityController } from './security.controller';
+import { LoginHistory, SecurityAlert, TrustedDevice } from './entities';
+import { User } from '../users/entities/user.entity';
+import { Session } from '../auth/entities/session.entity';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([
-      MerchantIpAllowlist,
-      SecurityEvent,
-      IpBlock,
-      Merchant,
-    ]),
-    BullModule.registerQueue({
-      name: 'ip-expiry',
-    }),
-    RedisModule,
-  ],
-  providers: [
-    IpBlockService,
-    IpAllowlistService,
-    SecurityEventService,
-    IpExpiryProcessor,
-  ],
-  controllers: [
-    MerchantIpAllowlistController,
-    SecurityController,
-  ],
-  exports: [
-    IpBlockService,
-    IpAllowlistService,
-    SecurityEventService,
-  ],
+  imports: [TypeOrmModule.forFeature([LoginHistory, SecurityAlert, TrustedDevice, User, Session])],
+  providers: [SecurityService],
+  controllers: [SecurityController],
+  exports: [SecurityService],
 })
 export class SecurityModule {}

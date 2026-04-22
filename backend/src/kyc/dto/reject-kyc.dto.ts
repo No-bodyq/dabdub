@@ -1,12 +1,9 @@
-import { IsEnum, IsString, MaxLength, MinLength } from 'class-validator';
-import { KycRejectionReason } from '../enums';
+import { ApiProperty } from '@nestjs/swagger';
+import { IsString, Length } from 'class-validator';
 
 export class RejectKycDto {
+  @ApiProperty({ description: 'Reason for rejection shown to user' })
   @IsString()
-  @MinLength(20)
-  @MaxLength(2000)
-  reviewNote: string;
-
-  @IsEnum(KycRejectionReason)
-  rejectionReason: KycRejectionReason;
+  @Length(1, 1000)
+  reviewNote!: string;
 }
