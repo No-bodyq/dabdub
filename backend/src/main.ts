@@ -1,76 +1,28 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe, Logger, VersioningType } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
+import { ValidationPipe } from '@nestjs/common';
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
-import type { AppConfig } from './config';
-import {
-  API_VERSION_POLICY,
-  DOCUMENTED_API_VERSIONS,
-} from './api-version/api-version.policy';
-import { filterOpenApiPathsForVersion } from './api-version/filter-openapi-for-version';
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const { version } = require('../package.json') as { version: string };
 
-async function bootstrap(): Promise<void> {
-  const logger = new Logger('Bootstrap');
-  const app = await NestFactory.create(AppModule, {
-    logger: ['error', 'warn', 'log', 'debug', 'verbose'],
-  });
-  app.useLogger(app.get(WINSTON_MODULE_NEST_PROVIDER));
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
 
-  const config = app.get(ConfigService);
-  const port = config.get<AppConfig['port']>('app.port')!;
-  const apiPrefix = config.get<AppConfig['apiPrefix']>('app.apiPrefix')!;
-
+  app.setGlobalPrefix('api/v1');
+  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   app.enableCors();
-  app.setGlobalPrefix(apiPrefix);
-  app.enableVersioning({
-    type: VersioningType.URI,
-  });
 
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-    }),
-  );
+  const config = new DocumentBuilder()
+    .setTitle('CheesePay API')
+    .setDescription('Crypto-to-Fiat Settlement Platform')
+    .setVersion('1.0')
+    .addBearerAuth()
+    .addApiKey({ type: 'apiKey', name: 'x-api-key', in: 'header' }, 'api-key')
+    .build();
 
-  if (process.env.NODE_ENV !== 'production') {
-    const swaggerConfig = new DocumentBuilder()
-      .setTitle('CheesePay API')
-      .setDescription(
-        'CheesePay HTTP API. Per-version specs under /docs/v{n}; default /docs matches the current major version from API_VERSION_POLICY.',
-      )
-      .setVersion(version)
-      .addBearerAuth()
-      .build();
-    const fullDocument = SwaggerModule.createDocument(app, swaggerConfig);
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('docs', app, document);
 
-    const currentMajor = API_VERSION_POLICY.current.replace(/^v/, '');
-    for (const apiVersion of DOCUMENTED_API_VERSIONS) {
-      const document = filterOpenApiPathsForVersion(fullDocument, apiVersion);
-      SwaggerModule.setup(
-        `${apiPrefix}/docs/v${apiVersion}`,
-        app,
-        document,
-      );
-      logger.log(
-        `Swagger v${apiVersion} at http://localhost:${port}/${apiPrefix}/docs/v${apiVersion}`,
-      );
-    }
-
-    const defaultDoc = filterOpenApiPathsForVersion(fullDocument, currentMajor);
-    SwaggerModule.setup(`${apiPrefix}/docs`, app, defaultDoc);
-    logger.log(
-      `Swagger (default = v${currentMajor}) at http://localhost:${port}/${apiPrefix}/docs`,
-    );
-  }
-
-  await app.listen(port);
-  logger.log(`Application running on http://localhost:${port}/${apiPrefix}`);
+  await app.listen(process.env.PORT ?? 3000);
+  console.log(`CheesePay API running on port ${process.env.PORT ?? 3000}`);
 }
 
 bootstrap();

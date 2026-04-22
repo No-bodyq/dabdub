@@ -1,65 +1,77 @@
-import { Entity, Column, Index } from 'typeorm';
-import { BaseEntity } from '../../common/entities/base.entity';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  OneToMany,
+} from 'typeorm';
+import { Payment } from '../../payments/entities/payment.entity';
+import { Settlement } from '../../settlements/entities/settlement.entity';
+import { Webhook } from '../../webhooks/entities/webhook.entity';
 
-export enum MerchantBusinessType {
-  RETAIL = 'retail',
-  FOOD = 'food',
-  SERVICES = 'services',
-  TRANSPORT = 'transport',
-  OTHER = 'other',
-}
-
-export enum MerchantSettlementCurrency {
-  NGN = 'NGN',
-  USDC = 'USDC',
+export enum MerchantStatus {
+  ACTIVE = 'active',
+  SUSPENDED = 'suspended',
+  PENDING = 'pending',
 }
 
 @Entity('merchants')
-export class Merchant extends BaseEntity {
-  @Index({ unique: true })
-  @Column({ name: 'user_id', unique: true })
-  userId!: string;
+export class Merchant {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
 
-  @Column({ name: 'business_name', length: 80 })
-  businessName!: string;
+  @Column({ unique: true })
+  email: string;
 
-  @Column({
-    name: 'business_type',
-    type: 'enum',
-    enum: MerchantBusinessType,
-  })
-  businessType!: MerchantBusinessType;
+  @Column()
+  passwordHash: string;
 
-  @Column({ name: 'logo_key', length: 255, nullable: true, default: null })
-  logoKey!: string | null;
+  @Column()
+  businessName: string;
 
-  @Column({ length: 300, nullable: true, default: null })
-  description!: string | null;
+  @Column({ nullable: true })
+  businessType: string;
 
-  @Column({ name: 'is_verified', default: false })
-  isVerified!: boolean;
+  @Column({ nullable: true })
+  country: string;
 
-  @Column({
-    name: 'settlement_currency',
-    type: 'enum',
-    enum: MerchantSettlementCurrency,
-    default: MerchantSettlementCurrency.NGN,
-  })
-  settlementCurrency!: MerchantSettlementCurrency;
+  @Column({ nullable: true })
+  bankAccountNumber: string;
 
-  @Column({ name: 'auto_settle_enabled', default: true })
-  autoSettleEnabled!: boolean;
+  @Column({ nullable: true })
+  bankCode: string;
 
-  @Column({
-    name: 'settlement_threshold_usdc',
-    type: 'numeric',
-    precision: 18,
-    scale: 6,
-    default: 10,
-    transformer: {
-      to: (value: number | string) => value,
-      from: (value: string) => Number(value),
-    },
-  })
-  settlementThresholdUsdc!: number;
+  @Column({ nullable: true })
+  bankName: string;
+
+  @Column({ type: 'enum', enum: MerchantStatus, default: MerchantStatus.PENDING })
+  status: MerchantStatus;
+
+  @Column({ nullable: true })
+  apiKey: string;
+
+  @Column({ nullable: true })
+  apiKeyHash: string;
+
+  @Column({ type: 'decimal', precision: 18, scale: 6, default: 0 })
+  totalVolumeUsd: number;
+
+  @Column({ type: 'decimal', precision: 5, scale: 4, default: 0.015 })
+  feeRate: number;
+
+  @OneToMany(() => Payment, (payment) => payment.merchant)
+  payments: Payment[];
+
+  @OneToMany(() => Settlement, (settlement) => settlement.merchant)
+  settlements: Settlement[];
+
+  @OneToMany(() => Webhook, (webhook) => webhook.merchant)
+  webhooks: Webhook[];
+
+  @CreateDateColumn()
+  createdAt: Date;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
 }
