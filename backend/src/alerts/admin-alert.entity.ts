@@ -1,9 +1,16 @@
-import { Column, Entity, Index } from 'typeorm';
-import { BaseEntity } from '../common/entities/base.entity';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  Index,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 
 export enum AdminAlertType {
-  REDIS_HEALTH = 'redis_health',
-  STELLAR_HEALTH = 'stellar_health',
+  STELLAR_MONITOR = 'stellar_monitor',
+  SETTLEMENT_FAILURE = 'settlement_failure',
+  WEBHOOK_FAILURE = 'webhook_failure',
 }
 
 export enum AdminAlertStatus {
@@ -13,38 +20,47 @@ export enum AdminAlertStatus {
 
 @Entity('admin_alerts')
 @Index(['type', 'dedupeKey'], { unique: true })
-export class AdminAlert extends BaseEntity {
+export class AdminAlert {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
   @Column({ type: 'enum', enum: AdminAlertType })
-  type!: AdminAlertType;
+  type: AdminAlertType;
 
   @Column({ name: 'dedupe_key', length: 128 })
-  dedupeKey!: string;
+  dedupeKey: string;
 
   @Column({
     type: 'enum',
     enum: AdminAlertStatus,
     default: AdminAlertStatus.OPEN,
   })
-  status!: AdminAlertStatus;
+  status: AdminAlertStatus;
 
   @Column({ type: 'text' })
-  message!: string;
+  message: string;
 
   @Column({ name: 'occurrence_count', type: 'int', default: 1 })
-  occurrenceCount!: number;
+  occurrenceCount: number;
 
   @Column({ name: 'threshold_value', type: 'int' })
-  thresholdValue!: number;
+  thresholdValue: number;
 
   @Column({ name: 'metadata', type: 'jsonb', nullable: true })
-  metadata!: Record<string, unknown> | null;
+  metadata: Record<string, unknown> | null;
 
-  @Column({ name: 'last_notified_at', type: 'timestamptz', nullable: true })
-  lastNotifiedAt!: Date | null;
+  @Column({ name: 'last_notified_at', type: 'timestamp', nullable: true })
+  lastNotifiedAt: Date | null;
 
-  @Column({ name: 'acknowledged_at', type: 'timestamptz', nullable: true })
-  acknowledgedAt!: Date | null;
+  @Column({ name: 'acknowledged_at', type: 'timestamp', nullable: true })
+  acknowledgedAt: Date | null;
 
   @Column({ name: 'acknowledged_by', type: 'uuid', nullable: true })
-  acknowledgedBy!: string | null;
+  acknowledgedBy: string | null;
+
+  @CreateDateColumn()
+  createdAt: Date;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
 }

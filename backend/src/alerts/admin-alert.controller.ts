@@ -1,8 +1,10 @@
-import { Controller, Get, Param, Patch, Req } from '@nestjs/common';
+import { Controller, Get, Param, Patch, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
+import { JwtAuthGuard } from '../auth/guards/jwt.guard';
 import { AdminAlert } from './admin-alert.entity';
 import { AdminAlertService } from './admin-alert.service';
 
+@UseGuards(JwtAuthGuard)
 @Controller('admin/alerts')
 export class AdminAlertController {
   constructor(private readonly adminAlertService: AdminAlertService) {}
@@ -18,7 +20,8 @@ export class AdminAlertController {
     @Req() req: Request,
   ): Promise<AdminAlert> {
     const adminId =
-      (req as Request & { user?: { id?: string } }).user?.id ?? 'system';
+      (req as Request & { user?: { merchantId?: string } }).user?.merchantId ??
+      'system';
     return this.adminAlertService.acknowledge(id, adminId);
   }
 }

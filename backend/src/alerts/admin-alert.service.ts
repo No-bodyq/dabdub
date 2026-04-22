@@ -1,10 +1,8 @@
-import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import type { ConfigType } from '@nestjs/config';
+import axios from 'axios';
 import { Repository } from 'typeorm';
-import { zeptoConfig } from '../config';
-import { adminAlertConfig } from '../config/admin-alert.config';
-import { CheeseGateway, WS_EVENTS } from '../ws/cheese.gateway';
 import {
   AdminAlert,
   AdminAlertStatus,
@@ -26,11 +24,7 @@ export class AdminAlertService {
   constructor(
     @InjectRepository(AdminAlert)
     private readonly adminAlertRepo: Repository<AdminAlert>,
-    @Inject(adminAlertConfig.KEY)
-    private readonly config: ConfigType<typeof adminAlertConfig>,
-    @Inject(zeptoConfig.KEY)
-    private readonly zepto: ConfigType<typeof zeptoConfig>,
-    private readonly cheeseGateway: CheeseGateway,
+    private readonly config: ConfigService,
   ) {}
 
   async raise(input: RaiseAlertInput): Promise<AdminAlert | null> {
@@ -105,11 +99,11 @@ export class AdminAlertService {
   }
 
   private meetsThreshold(type: AdminAlertType, value: number): boolean {
-    if (type === AdminAlertType.REDIS_HEALTH) {
-      return value >= this.config.redisFailureThreshold;
+    if (type === AdminAlertType.STELLAR_MONITOR) {
+      return value >= this.getNumberEnv('ADMIN_ALERT_STELLAR_FAILURE_THRESHOLD', 1);
     }
 
-    return value >= this.config.stellarFailureThreshold;
+    return value >= this.getNumberEnv('ADMIN_ALERT_FAILURE_THRESHOLD', 1);
   }
 
   private isCoolingDown(alert: AdminAlert, now: Date): boolean {
@@ -117,7 +111,8 @@ export class AdminAlertService {
       return false;
     }
 
-    const cooldownMs = this.config.cooldownMinutes * 60_000;
+    const cooldownMs =
+      this.getNumberEnv('ADMIN_ALERT_COOLDOWN_MINUTES', 30) * 60_000;
     return now.getTime() - alert.lastNotifiedAt.getTime() < cooldownMs;
   }
 
@@ -125,68 +120,77 @@ export class AdminAlertService {
     await Promise.allSettled([
       this.notifySlack(alert),
       this.notifyEmail(alert),
-      Promise.resolve(
-        this.cheeseGateway.emitToAdmins(WS_EVENTS.NOTIFICATION_NEW, {
-          type: alert.type,
-          message: alert.message,
-          occurrenceCount: alert.occurrenceCount,
-        }),
-      ),
     ]);
   }
 
   private async notifySlack(alert: AdminAlert): Promise<void> {
-    if (!this.config.slackWebhookUrl) {
+    const webhookUrl = this.config.get<string>('ADMIN_ALERT_SLACK_WEBHOOK_URL');
+    if (!webhookUrl) {
       return;
     }
 
-    const response = await fetch(this.config.slackWebhookUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    const response = await axios.post(
+      webhookUrl,
+      {
         text: `[${alert.type}] ${alert.message}`,
-      }),
-    });
+      },
+      {
+        headers: { 'Content-Type': 'application/json' },
+        validateStatus: () => true,
+      },
+    );
 
-    if (!response.ok) {
-      this.logger.warn(
-        `Slack alert delivery failed with HTTP ${response.status}`,
-      );
+    if (response.status >= 400) {
+      this.logger.warn(`Slack alert delivery failed with HTTP ${response.status}`);
     }
   }
 
   private async notifyEmail(alert: AdminAlert): Promise<void> {
-    if (!this.config.emailRecipient) {
+    const emailRecipient = this.config.get<string>('ADMIN_ALERT_EMAIL');
+    const zeptoApiKey = this.config.get<string>('ZEPTOMAIL_API_KEY');
+    const zeptoFromEmail = this.config.get<string>('ZEPTOMAIL_FROM_EMAIL');
+
+    if (!emailRecipient || !zeptoApiKey || !zeptoFromEmail) {
       return;
     }
 
-    const response = await fetch('https://api.zeptomail.com/v1.1/email', {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-        authorization: this.zepto.apiKey,
-      },
-      body: JSON.stringify({
+    const response = await axios.post(
+      'https://api.zeptomail.com/v1.1/email',
+      {
         from: {
-          address: this.zepto.fromEmail,
+          address: zeptoFromEmail,
         },
         to: [
           {
             email_address: {
-              address: this.config.emailRecipient,
+              address: emailRecipient,
             },
           },
         ],
         subject: `[Admin Alert] ${alert.type}`,
-        htmlbody: `<p>${alert.message}</p><pre>${JSON.stringify(alert.metadata ?? {}, null, 2)}</pre>`,
-      }),
-    });
+        htmlbody: `<p>${alert.message}</p><pre>${JSON.stringify(
+          alert.metadata ?? {},
+          null,
+          2,
+        )}</pre>`,
+      },
+      {
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          authorization: zeptoApiKey,
+        },
+        validateStatus: () => true,
+      },
+    );
 
-    if (!response.ok) {
-      this.logger.warn(
-        `Email alert delivery failed with HTTP ${response.status}`,
-      );
+    if (response.status >= 400) {
+      this.logger.warn(`Email alert delivery failed with HTTP ${response.status}`);
     }
+  }
+
+  private getNumberEnv(name: string, fallback: number): number {
+    const value = this.config.get<string>(name);
+    return value ? Number(value) : fallback;
   }
 }

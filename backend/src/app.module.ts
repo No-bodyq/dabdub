@@ -1,64 +1,43 @@
 import { Module } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
-import { ConfigType } from '@nestjs/config';
-import { BullModule } from '@nestjs/bull';
-import { ThrottlerModule } from '@nestjs/throttler';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AdminAlertModule } from './alerts/admin-alert.module';
-import { AppConfigModule, appConfig, redisConfig } from './config';
-import { DatabaseModule } from './database/database.module';
-import { HealthModule } from './health/health.module';
 import { AuthModule } from './auth/auth.module';
-import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
-import { WsModule } from './ws/ws.module';
+import { MerchantsModule } from './merchants/merchants.module';
+import { PaymentsModule } from './payments/payments.module';
+import { StellarModule } from './stellar/stellar.module';
+import { SettlementsModule } from './settlements/settlements.module';
+import { WebhooksModule } from './webhooks/webhooks.module';
+import { WaitlistModule } from './waitlist/waitlist.module';
 
 @Module({
   imports: [
-    // 1. Config — global, validates all env vars at startup with abortEarly: false.
-    AppConfigModule,
-
-    // 2. Database — owns the TypeORM root connection; see database.module.ts.
-    DatabaseModule,
-
-    // 3. Bull — async Redis connection via typed RedisConfig.
-    BullModule.forRootAsync({
-      inject: [redisConfig.KEY],
-      useFactory: (redis: ConfigType<typeof redisConfig>) => ({
-        redis: {
-          host: redis.host,
-          port: redis.port,
-          password: redis.password,
-        },
+    ConfigModule.forRoot({ isGlobal: true }),
+    ScheduleModule.forRoot(),
+    TypeOrmModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: (config: ConfigService) => ({
+        type: 'postgres',
+        host: config.get('DB_HOST', 'localhost'),
+        port: config.get<number>('DB_PORT', 5432),
+        username: config.get('DB_USER', 'postgres'),
+        password: config.get('DB_PASSWORD'),
+        database: config.get('DB_NAME', 'cheesepay'),
+        entities: [__dirname + '/**/*.entity{.ts,.js}'],
+        synchronize: config.get('NODE_ENV') !== 'production',
+        logging: config.get('NODE_ENV') === 'development',
       }),
+      inject: [ConfigService],
     }),
-
-    // 4. Throttler — rate limiting via typed AppConfig.
-    ThrottlerModule.forRootAsync({
-      inject: [appConfig.KEY],
-      useFactory: (app: ConfigType<typeof appConfig>) => ({
-        throttlers: [
-          {
-            ttl: app.throttleTtl * 1000,
-            limit: app.throttleLimit,
-          },
-        ],
-      }),
-    }),
-
     AdminAlertModule,
-    HealthModule,
-
-    // 5. Auth — register/login/refresh/logout + global JWT guard.
     AuthModule,
-
-    // 6. WebSockets — Socket.io real-time gateway.
-    WsModule,
-  ],
-  providers: [
-    // Global guard: every route requires a valid JWT unless decorated @Public().
-    {
-      provide: APP_GUARD,
-      useClass: JwtAuthGuard,
-    },
+    MerchantsModule,
+    PaymentsModule,
+    StellarModule,
+    SettlementsModule,
+    WebhooksModule,
+    WaitlistModule,
   ],
 })
 export class AppModule {}

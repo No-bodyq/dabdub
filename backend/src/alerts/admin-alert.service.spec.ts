@@ -10,10 +10,6 @@ describe('AdminAlertService', () => {
     findOne,
     find: jest.fn(),
   };
-  const gateway = {
-    emitToAdmins: jest.fn().mockResolvedValue(undefined),
-  };
-
   beforeEach(() => {
     jest.clearAllMocks();
   });
@@ -21,8 +17,8 @@ describe('AdminAlertService', () => {
   it('suppresses duplicate notifications during cooldown', async () => {
     findOne.mockResolvedValue({
       id: 'alert-1',
-      type: AdminAlertType.REDIS_HEALTH,
-      dedupeKey: 'redis',
+      type: AdminAlertType.STELLAR_MONITOR,
+      dedupeKey: 'stellar-monitor',
       status: AdminAlertStatus.OPEN,
       message: 'old',
       occurrenceCount: 1,
@@ -36,27 +32,21 @@ describe('AdminAlertService', () => {
     const service = new AdminAlertService(
       repo as never,
       {
-        cooldownMinutes: 30,
-        emailRecipient: null,
-        slackWebhookUrl: null,
-        redisFailureThreshold: 1,
-        stellarFailureThreshold: 1,
+        get: jest.fn((key: string) => {
+          if (key === 'ADMIN_ALERT_COOLDOWN_MINUTES') return '30';
+          if (key === 'ADMIN_ALERT_STELLAR_FAILURE_THRESHOLD') return '1';
+          return undefined;
+        }),
       } as never,
-      {
-        apiKey: 'zepto-key',
-        fromEmail: 'alerts@example.com',
-      } as never,
-      gateway as never,
     );
 
     const result = await service.raise({
-      type: AdminAlertType.REDIS_HEALTH,
-      dedupeKey: 'redis',
-      message: 'Redis is down',
+      type: AdminAlertType.STELLAR_MONITOR,
+      dedupeKey: 'stellar-monitor',
+      message: 'Stellar monitor failed',
       thresholdValue: 1,
     });
 
     expect(result?.occurrenceCount).toBe(2);
-    expect(gateway.emitToAdmins).not.toHaveBeenCalled();
   });
 });
