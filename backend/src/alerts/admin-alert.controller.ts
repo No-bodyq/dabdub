@@ -1,0 +1,24 @@
+import { Controller, Get, Param, Patch, Req } from '@nestjs/common';
+import type { Request } from 'express';
+import { AdminAlert } from './admin-alert.entity';
+import { AdminAlertService } from './admin-alert.service';
+
+@Controller('admin/alerts')
+export class AdminAlertController {
+  constructor(private readonly adminAlertService: AdminAlertService) {}
+
+  @Get()
+  list(): Promise<AdminAlert[]> {
+    return this.adminAlertService.list();
+  }
+
+  @Patch(':id/acknowledge')
+  acknowledge(
+    @Param('id') id: string,
+    @Req() req: Request,
+  ): Promise<AdminAlert> {
+    const adminId =
+      (req as Request & { user?: { id?: string } }).user?.id ?? 'system';
+    return this.adminAlertService.acknowledge(id, adminId);
+  }
+}

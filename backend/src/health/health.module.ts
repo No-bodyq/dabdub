@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TerminusModule } from '@nestjs/terminus';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { AdminAlertModule } from '../alerts/admin-alert.module';
 import { HealthController } from './health.controller';
 import { RedisHealthIndicator } from './redis.health';
 import { StellarHealthIndicator } from './stellar.health';
@@ -15,6 +16,7 @@ import { StellarHealthIndicator } from './stellar.health';
  */
 @Module({
   imports: [
+    AdminAlertModule,
     TerminusModule,
     // Required for TypeOrmHealthIndicator to resolve the active DataSource.
     TypeOrmModule,

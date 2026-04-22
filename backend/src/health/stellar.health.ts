@@ -1,8 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { HealthIndicator, HealthIndicatorResult, HealthCheckError } from '@nestjs/terminus';
+import {
+  HealthIndicator,
+  HealthIndicatorResult,
+  HealthCheckError,
+} from '@nestjs/terminus';
 import { Inject } from '@nestjs/common';
 import { stellarConfig } from '../config';
 import type { StellarConfig } from '../config';
+import { AdminAlertService } from '../alerts/admin-alert.service';
+import { AdminAlertType } from '../alerts/admin-alert.entity';
 
 /** Milliseconds before the Stellar RPC call is considered timed out. */
 const STELLAR_TIMEOUT_MS = 5_000;
@@ -20,10 +26,12 @@ const STELLAR_TIMEOUT_MS = 5_000;
 export class StellarHealthIndicator extends HealthIndicator {
   private readonly logger = new Logger(StellarHealthIndicator.name);
   private readonly feeStatsUrl: string;
+  private failureCount = 0;
 
   constructor(
     @Inject(stellarConfig.KEY)
     private readonly cfg: StellarConfig,
+    private readonly adminAlertService: AdminAlertService,
   ) {
     super();
     // Normalise: strip trailing slash so the path join is always clean.
@@ -53,8 +61,10 @@ export class StellarHealthIndicator extends HealthIndicator {
         );
       }
 
+      this.failureCount = 0;
       return this.getStatus(key, true);
     } catch (err) {
+      this.failureCount += 1;
       const message =
         err instanceof Error
           ? err.name === 'AbortError'
@@ -63,6 +73,15 @@ export class StellarHealthIndicator extends HealthIndicator {
           : String(err);
 
       this.logger.warn(`Stellar health check failed: ${message}`);
+      await this.adminAlertService.raise({
+        type: AdminAlertType.STELLAR_HEALTH,
+        dedupeKey: key,
+        message: `Stellar health check failed: ${message}`,
+        metadata: {
+          rpcUrl: this.cfg.rpcUrl,
+        },
+        thresholdValue: this.failureCount,
+      });
 
       const result = this.getStatus(key, false, { message });
       throw new HealthCheckError(`${key} is down`, result);

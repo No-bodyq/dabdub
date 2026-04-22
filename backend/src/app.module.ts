@@ -3,6 +3,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { ConfigType } from '@nestjs/config';
 import { BullModule } from '@nestjs/bull';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { AdminAlertModule } from './alerts/admin-alert.module';
 import { AppConfigModule, appConfig, redisConfig } from './config';
 import { DatabaseModule } from './database/database.module';
 import { HealthModule } from './health/health.module';
@@ -43,6 +44,7 @@ import { WsModule } from './ws/ws.module';
       }),
     }),
 
+    AdminAlertModule,
     HealthModule,
 
     // 5. Auth — register/login/refresh/logout + global JWT guard.
@@ -60,4 +62,3 @@ import { WsModule } from './ws/ws.module';
   ],
 })
 export class AppModule {}
-

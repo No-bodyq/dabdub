@@ -1,8 +1,14 @@
 import { Injectable, Logger, Inject } from '@nestjs/common';
-import { HealthIndicator, HealthIndicatorResult, HealthCheckError } from '@nestjs/terminus';
+import {
+  HealthIndicator,
+  HealthIndicatorResult,
+  HealthCheckError,
+} from '@nestjs/terminus';
 import Redis from 'ioredis';
 import { redisConfig } from '../config';
 import type { RedisConfig } from '../config';
+import { AdminAlertService } from '../alerts/admin-alert.service';
+import { AdminAlertType } from '../alerts/admin-alert.entity';
 
 /**
  * RedisHealthIndicator pings Redis using ioredis and reports the result
@@ -15,10 +21,12 @@ import type { RedisConfig } from '../config';
 export class RedisHealthIndicator extends HealthIndicator {
   private readonly logger = new Logger(RedisHealthIndicator.name);
   private readonly client: Redis;
+  private failureCount = 0;
 
   constructor(
     @Inject(redisConfig.KEY)
     private readonly cfg: RedisConfig,
+    private readonly adminAlertService: AdminAlertService,
   ) {
     super();
     this.client = new Redis({
@@ -55,13 +63,26 @@ export class RedisHealthIndicator extends HealthIndicator {
       const reply = await this.client.ping();
 
       if (reply !== 'PONG') {
-        throw new Error(`Unexpected PING reply: ${reply}`);
+        throw new Error(`Unexpected PING reply: ${String(reply)}`);
       }
 
+      this.failureCount = 0;
       return this.getStatus(key, true);
     } catch (err) {
+      this.failureCount += 1;
+      const message = err instanceof Error ? err.message : String(err);
+      await this.adminAlertService.raise({
+        type: AdminAlertType.REDIS_HEALTH,
+        dedupeKey: key,
+        message: `Redis health check failed: ${message}`,
+        metadata: {
+          host: this.cfg.host,
+          port: this.cfg.port,
+        },
+        thresholdValue: this.failureCount,
+      });
       const result = this.getStatus(key, false, {
-        message: err instanceof Error ? err.message : String(err),
+        message,
       });
       throw new HealthCheckError(`${key} is down`, result);
     }
