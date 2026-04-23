@@ -1,54 +1,39 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { Logger, ValidationPipe } from '@nestjs/common';
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
-import {
-  telemetryConfig,
-  type AppConfig,
-  type TelemetryConfig,
-} from './config';
-import { shutdownTelemetry, startTelemetry } from './telemetry/telemetry';
+import { readTelemetryConfig, shutdownTelemetry, startTelemetry } from './telemetry/telemetry';
 
 async function bootstrap(): Promise<void> {
   const logger = new Logger('Bootstrap');
-  const telemetry = telemetryConfig() as unknown as () => TelemetryConfig;
-  startTelemetry(telemetry());
-  const app = await NestFactory.create(AppModule, {
-    logger: ['error', 'warn', 'log', 'debug', 'verbose'],
-  });
+  startTelemetry(readTelemetryConfig());
+  const app = await NestFactory.create(AppModule);
+  const port = process.env.PORT ?? 3000;
 
-  const config = app.get(ConfigService);
-  const port = config.get<AppConfig['port']>('app.port')!;
-  const apiPrefix = config.get<AppConfig['apiPrefix']>('app.apiPrefix')!;
-
+  app.setGlobalPrefix('api/v1');
+  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   app.enableCors();
-  app.setGlobalPrefix(apiPrefix);
 
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-    }),
-  );
-
-  const swaggerConfig = new DocumentBuilder()
-    .setTitle('Cheese Backend API')
-    .setDescription('API documentation')
+  const config = new DocumentBuilder()
+    .setTitle('CheesePay API')
+    .setDescription('Crypto-to-Fiat Settlement Platform')
     .setVersion('1.0')
     .addBearerAuth()
+    .addApiKey({ type: 'apiKey', name: 'x-api-key', in: 'header' }, 'api-key')
     .build();
-  const document = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup(`${apiPrefix}/docs`, app, document);
+
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('docs', app, document);
 
   process.once('SIGTERM', () => {
     void shutdownTelemetry();
   });
+  process.once('SIGINT', () => {
+    void shutdownTelemetry();
+  });
 
   await app.listen(port);
-  logger.log(`Application running on http://localhost:${port}/${apiPrefix}`);
-  logger.log(`Swagger docs at http://localhost:${port}/${apiPrefix}/docs`);
+  logger.log(`CheesePay API running on port ${port}`);
 }
 
 void bootstrap();

@@ -8,9 +8,24 @@ import {
   ConsoleSpanExporter,
   SimpleSpanProcessor,
 } from '@opentelemetry/sdk-trace-base';
-import type { TelemetryConfig } from '../config';
+
+export interface TelemetryConfig {
+  enabled: boolean;
+  serviceName: string;
+  collectorUrl: string | null;
+  consoleExporter: boolean;
+}
 
 let sdk: NodeSDK | null = null;
+
+export function readTelemetryConfig(): TelemetryConfig {
+  return {
+    enabled: process.env.OTEL_ENABLED === 'true',
+    serviceName: process.env.OTEL_SERVICE_NAME ?? 'cheesepay-backend',
+    collectorUrl: process.env.OTEL_EXPORTER_OTLP_ENDPOINT ?? null,
+    consoleExporter: process.env.OTEL_TRACE_CONSOLE === 'true',
+  };
+}
 
 export function startTelemetry(config: TelemetryConfig): NodeSDK | null {
   const telemetryEnabled =
