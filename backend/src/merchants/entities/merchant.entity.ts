@@ -72,6 +72,17 @@ export class Merchant {
   @Column({ type: 'decimal', precision: 5, scale: 4, default: 0.015 })
   feeRate: number;
 
+  /** Per-merchant custom fee rate override. Null means use global default. */
+  @Column({
+    name: 'custom_fee_rate',
+    type: 'numeric',
+    precision: 7,
+    scale: 6,
+    nullable: true,
+    default: null,
+  })
+  customFeeRate: string | null;
+
   @OneToMany(() => Payment, (payment) => payment.merchant)
   payments: Payment[];
 

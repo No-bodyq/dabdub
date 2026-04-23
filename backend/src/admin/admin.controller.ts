@@ -1,5 +1,6 @@
-import { Controller, Get, Patch, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Patch, Body, Param, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import { Request } from 'express';
 import { AdminService } from './admin.service';
 import { MerchantStatus, MerchantRole } from '../merchants/entities/merchant.entity';
 import { JwtAuthGuard } from '../auth/guards/jwt.guard';
@@ -42,5 +43,25 @@ export class AdminController {
   @ApiOperation({ summary: 'Get global stats' })
   getStats() {
     return this.adminService.getGlobalStats();
+  }
+
+  @Get('fees')
+  @ApiOperation({ summary: 'List all global fee configurations' })
+  getFees() {
+    return this.adminService.getGlobalFees();
+  }
+
+  @Patch('fees')
+  @ApiOperation({ summary: 'Update a global fee rate' })
+  updateFee(
+    @Body() dto: { feeType: string; newRate: string; reason?: string },
+    @Req() req: Request & { user: { id: string } },
+  ) {
+    return this.adminService.updateGlobalFee(
+      dto.feeType as any,
+      dto.newRate,
+      req.user.id,
+      dto.reason,
+    );
   }
 }

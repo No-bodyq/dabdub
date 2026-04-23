@@ -3,6 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { Merchant, MerchantStatus } from '../merchants/entities/merchant.entity';
 import { Payment } from '../payments/entities/payment.entity';
+import { FeeConfig, FeeType } from '../fee-config/entities/fee-config.entity';
+import { FeeHistory, FeeChangeType } from '../fee-config/entities/fee-history.entity';
 
 @Injectable()
 export class AdminService {
@@ -11,6 +13,10 @@ export class AdminService {
     private merchantsRepo: Repository<Merchant>,
     @InjectRepository(Payment)
     private paymentsRepo: Repository<Payment>,
+    @InjectRepository(FeeConfig)
+    private readonly feeConfigRepo: Repository<FeeConfig>,
+    @InjectRepository(FeeHistory)
+    private readonly feeHistoryRepo: Repository<FeeHistory>,
   ) {}
 
   async findAllMerchants(page = 1, limit = 20) {
@@ -31,8 +37,7 @@ export class AdminService {
   async updateMerchantStatus(id: string, status: MerchantStatus) {
     const merchant = await this.merchantsRepo.findOne({ where: { id } });
     if (!merchant) throw new NotFoundException('Merchant not found');
-    
-    // Status transition logic if any (e.g., cannot go from SUSPENDED back to PENDING)
+
     merchant.status = status;
     await this.merchantsRepo.save(merchant);
     return this.sanitize(merchant);
@@ -79,7 +84,54 @@ export class AdminService {
   }
 
   private sanitize(merchant: Merchant) {
-    const { passwordHash, apiKeyHash, ...rest } = merchant;
+    const { passwordHash, apiKeyHash, ...rest } = merchant as any;
     return rest;
+  }
+
+  // ── Fee Management ─────────────────────────────────────────────────────────
+
+  async getGlobalFees(): Promise<FeeConfig[]> {
+    return this.feeConfigRepo.find({ order: { feeType: 'ASC' } });
+  }
+
+  async updateGlobalFee(
+    feeType: FeeType,
+    newRate: string,
+    adminId: string,
+    reason?: string,
+  ): Promise<FeeConfig> {
+    const feeConfig = await this.feeConfigRepo.findOne({ where: { feeType } });
+    if (!feeConfig) {
+      throw new NotFoundException(`Fee config for ${feeType} not found`);
+    }
+
+    const previousValue = feeConfig.baseFeeRate;
+    feeConfig.baseFeeRate = newRate;
+    const updated = await this.feeConfigRepo.save(feeConfig);
+
+    await this.recordFeeHistory({
+      feeType,
+      changeType: FeeChangeType.GLOBAL,
+      merchantId: null,
+      previousValue,
+      newValue: newRate,
+      actorId: adminId,
+      reason: reason ?? null,
+    });
+
+    return updated;
+  }
+
+  async recordFeeHistory(dto: {
+    feeType: string;
+    changeType: FeeChangeType;
+    merchantId: string | null;
+    previousValue: string;
+    newValue: string;
+    actorId: string;
+    reason: string | null;
+  }): Promise<FeeHistory> {
+    const entry = this.feeHistoryRepo.create(dto);
+    return this.feeHistoryRepo.save(entry);
   }
 }
