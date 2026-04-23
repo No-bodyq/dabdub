@@ -1,7 +1,8 @@
 import { Process, Processor } from '@nestjs/bull';
-import { Logger } from '@nestjs/common';
+import { Inject, Logger, forwardRef } from '@nestjs/common';
 import type { Job } from 'bull';
 import { DEFAULT_QUEUE_JOB, QUEUE_NAMES } from './queue.constants';
+import { StellarMonitorService } from '../stellar/stellar-monitor.service';
 
 interface QueueDispatchPayload {
   type?: string;
@@ -60,8 +61,19 @@ export class NotificationQueueProcessor extends BaseQueueProcessor {
 
 @Processor(QUEUE_NAMES.stellarMonitor)
 export class StellarMonitorQueueProcessor extends BaseQueueProcessor {
-  constructor() {
+  constructor(
+    @Inject(forwardRef(() => StellarMonitorService))
+    private readonly stellarMonitor: StellarMonitorService,
+  ) {
     super(StellarMonitorQueueProcessor.name);
+  }
+
+  @Process('scan')
+  async handleScan(job: Job): Promise<void> {
+    const start = Date.now();
+    this.logger.log(`Stellar monitor job #${job.id} started`);
+    await this.stellarMonitor.scanPendingPayments();
+    this.logger.log(`Stellar monitor job #${job.id} done in ${Date.now() - start}ms`);
   }
 
   @Process(DEFAULT_QUEUE_JOB)
