@@ -18,8 +18,14 @@ import { QueueModule } from './queues/queue.module';
 import { SettlementsModule } from './settlements/settlements.module';
 import { StellarModule } from './stellar/stellar.module';
 import { WaitlistModule } from './waitlist/waitlist.module';
+<<<<<<< Analytics
+import { HealthModule } from './health/health.module';
+import { MerchantAnalyticsModule } from './analytics/merchant-analytics.module';
+import { WebhooksModule } from './webhooks/webhooks.module'
+=======
 import { WebhooksModule } from './webhooks/webhooks.module';
 import { AppThrottlerGuard } from './auth/guards/throttler.guard';
+>>>>>>> main
 
 @Module({
   imports: [
