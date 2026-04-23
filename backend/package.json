@@ -69,8 +69,18 @@
     "rootDir": "src",
     "testRegex": ".*\\.spec\\.ts$",
     "transform": { "^.+\\.(t|j)s$": "ts-jest" },
-    "collectCoverageFrom": ["**/*.(t|j)s"],
+    "collectCoverageFrom": ["**/*.(t|j)s", "!**/*.module.ts", "!**/main.ts"],
     "coverageDirectory": "../coverage",
+    "coverageReporters": ["lcov", "text-summary"],
+    "coverageThreshold": {
+      "global": {
+        "lines": 80,
+        "branches": 75
+      }
+    },
+    "moduleNameMapper": {
+      "^@/(.*)$": "<rootDir>/$1"
+    },
     "testEnvironment": "node"
   }
 }
