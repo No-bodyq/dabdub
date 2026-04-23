@@ -1,4 +1,12 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
+import { ConfigType } from '@nestjs/config';
+import { BullModule } from '@nestjs/bull';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { AppConfigModule, appConfig, redisConfig } from './config';
+import { MerchantAnalyticsModule } from './analytics/merchant-analytics.module';
+import { DatabaseModule } from './database/database.module';
+import { HealthModule } from './health/health.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -30,6 +38,11 @@ import { HealthModule } from './health/health.module';
       }),
       inject: [ConfigService],
     }),
+
+    HealthModule,
+    MerchantAnalyticsModule,
+
+    // 5. Auth — register/login/refresh/logout + global JWT guard.
     AuthModule,
     MerchantsModule,
     PaymentsModule,
