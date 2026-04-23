@@ -1,16 +1,16 @@
-import { NestFactory } from '@nestjs/core';
-import { ValidationPipe, Logger, RequestMethod } from '@nestjs/common';
+import { NestFactory, Reflector } from '@nestjs/core';
+import { ClassSerializerInterceptor, ValidationPipe, RequestMethod } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+import { readTelemetryConfig, shutdownTelemetry, startTelemetry } from './telemetry/telemetry';
+import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { version } = require('../package.json') as { version: string };
 
 async function bootstrap(): Promise<void> {
-  const logger = new Logger('Bootstrap');
-  const app = await NestFactory.create(AppModule, {
-    logger: ['error', 'warn', 'log', 'debug', 'verbose'],
-  });
+  startTelemetry(readTelemetryConfig());
+  const app = await NestFactory.create(AppModule);
 
   const config = app.get(ConfigService);
   const port = parseInt(String(config.get('PORT', 3000)), 10);
@@ -19,6 +19,8 @@ async function bootstrap(): Promise<void> {
   app.enableCors();
   app.setGlobalPrefix(apiPrefix, {
     exclude: [
+      { path: 'health', method: RequestMethod.ALL },
+      { path: 'health/ready', method: RequestMethod.ALL },
       { path: 'docs', method: RequestMethod.ALL },
       { path: 'docs/(.*)', method: RequestMethod.ALL },
       { path: 'docs-json', method: RequestMethod.GET },
@@ -32,6 +34,7 @@ async function bootstrap(): Promise<void> {
       transform: true,
     }),
   );
+  app.useGlobalInterceptors(new LoggingInterceptor(), new ClassSerializerInterceptor(app.get(Reflector)));
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('CheesePay API')
@@ -72,10 +75,14 @@ async function bootstrap(): Promise<void> {
     },
   });
 
+  process.once('SIGTERM', () => {
+    void shutdownTelemetry();
+  });
+  process.once('SIGINT', () => {
+    void shutdownTelemetry();
+  });
+
   await app.listen(port);
-  logger.log(`CheesePay API at http://localhost:${port}/${apiPrefix}`);
-  logger.log(`Swagger UI at http://localhost:${port}/docs`);
-  logger.log(`OpenAPI JSON at http://localhost:${port}/docs-json`);
 }
 
-bootstrap();
+void bootstrap();
