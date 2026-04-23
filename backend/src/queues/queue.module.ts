@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { BullModule } from '@nestjs/bull';
 import { QUEUE_LIST } from './queue.constants';
 import {
@@ -7,9 +7,20 @@ import {
   StellarMonitorQueueProcessor,
   WebhookQueueProcessor,
 } from './queue.processors';
+import { QueueAdminController } from './queue-admin.controller';
+import { StellarModule } from '../stellar/stellar.module';
 
 @Module({
-  imports: [BullModule.registerQueue(...QUEUE_LIST.map((name) => ({ name })))],
+  imports: [
+    BullModule.registerQueue(
+      ...QUEUE_LIST.map((name) => ({
+        name,
+        defaultJobOptions: { removeOnFail: false, attempts: 3, backoff: { type: 'exponential', delay: 5000 } },
+      })),
+    ),
+    forwardRef(() => StellarModule),
+  ],
+  controllers: [QueueAdminController],
   providers: [
     SettlementQueueProcessor,
     WebhookQueueProcessor,

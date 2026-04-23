@@ -1,9 +1,10 @@
-import { Controller, Post, Get, Param, Body, Query, UseGuards, Request } from '@nestjs/common';
+import { Controller, Post, Get, Param, Body, Query, UseGuards, Request, UseInterceptors } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { PaymentsService } from './payments.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt.guard';
 import { PaginationDto } from '../common/dto/pagination.dto';
+import { IdempotencyInterceptor } from '../payment/idempotency.interceptor';
 
 @ApiTags('payments')
 @ApiBearerAuth()
@@ -13,6 +14,7 @@ export class PaymentsController {
   constructor(private readonly paymentsService: PaymentsService) {}
 
   @Post()
+  @UseInterceptors(IdempotencyInterceptor)
   @ApiOperation({ summary: 'Create a payment request' })
   create(@Request() req, @Body() dto: CreatePaymentDto) {
     return this.paymentsService.create(req.user.merchantId, dto);
