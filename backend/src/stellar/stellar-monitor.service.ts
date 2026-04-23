@@ -1,11 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Payment, PaymentStatus } from '../payments/entities/payment.entity';
-import { StellarService } from './stellar.service';
-import { SettlementsService } from '../settlements/settlements.service';
-import { WebhooksService } from '../webhooks/webhooks.service';
+import { Injectable, Logger } from "@nestjs/common";
+import { Cron, CronExpression } from "@nestjs/schedule";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { Payment, PaymentStatus } from "../payments/entities/payment.entity";
+import { StellarService } from "./stellar.service";
+import { SettlementsService } from "../settlements/settlements.service";
+import { WebhooksService } from "../webhooks/webhooks.service";
 
 @Injectable()
 export class StellarMonitorService {
@@ -24,7 +24,7 @@ export class StellarMonitorService {
   async scanPendingPayments() {
     const pendingPayments = await this.paymentsRepo.find({
       where: { status: PaymentStatus.PENDING },
-      relations: ['merchant'],
+      relations: ["merchant"],
     });
 
     if (!pendingPayments.length) return;
@@ -36,9 +36,12 @@ export class StellarMonitorService {
     let transactions: any[];
 
     try {
-      transactions = await this.stellar.getAccountTransactions(depositAddress, cursor);
+      transactions = await this.stellar.getAccountTransactions(
+        depositAddress,
+        cursor,
+      );
     } catch (err) {
-      this.logger.error('Failed to fetch Stellar transactions', err.message);
+      this.logger.error("Failed to fetch Stellar transactions", err.message);
       return;
     }
 
@@ -48,7 +51,9 @@ export class StellarMonitorService {
       const paymentMemo = tx.memo;
       if (!paymentMemo) continue;
 
-      const matched = pendingPayments.find((p) => p.stellarMemo === paymentMemo);
+      const matched = pendingPayments.find(
+        (p) => p.stellarMemo === paymentMemo,
+      );
       if (!matched) continue;
 
       const result = await this.stellar.verifyPayment(tx.hash, paymentMemo);
@@ -72,12 +77,12 @@ export class StellarMonitorService {
     payment.txHash = txHash;
     payment.confirmedAt = new Date();
 
-    if (asset === 'USDC') payment.amountUsdc = amount;
+    if (asset === "USDC") payment.amountUsdc = amount;
     else payment.amountXlm = amount;
 
     await this.paymentsRepo.save(payment);
 
-    await this.webhooks.dispatch(payment.merchantId, 'payment.confirmed', {
+    await this.webhooks.dispatch(payment.merchantId, "payment.confirmed", {
       paymentId: payment.id,
       reference: payment.reference,
       txHash,
@@ -91,16 +96,16 @@ export class StellarMonitorService {
   private async expireOldPayments() {
     const now = new Date();
     const expired = await this.paymentsRepo
-      .createQueryBuilder('payment')
-      .where('payment.status = :status', { status: PaymentStatus.PENDING })
-      .andWhere('payment.expiresAt < :now', { now })
+      .createQueryBuilder("payment")
+      .where("payment.status = :status", { status: PaymentStatus.PENDING })
+      .andWhere("payment.expiresAt < :now", { now })
       .getMany();
 
     for (const payment of expired) {
       payment.status = PaymentStatus.EXPIRED;
       await this.paymentsRepo.save(payment);
 
-      await this.webhooks.dispatch(payment.merchantId, 'payment.expired', {
+      await this.webhooks.dispatch(payment.merchantId, "payment.expired", {
         paymentId: payment.id,
         reference: payment.reference,
       });

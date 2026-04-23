@@ -1,8 +1,8 @@
-import { Injectable, ConflictException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { IsEmail, IsOptional, IsString } from 'class-validator';
-import { WaitlistEntry } from './entities/waitlist.entity';
+import { Injectable, ConflictException } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { IsEmail, IsOptional, IsString } from "class-validator";
+import { WaitlistEntry } from "./entities/waitlist.entity";
 
 export class JoinWaitlistDto {
   @IsEmail() email: string;
@@ -19,8 +19,10 @@ export class WaitlistService {
   ) {}
 
   async join(dto: JoinWaitlistDto) {
-    const existing = await this.waitlistRepo.findOne({ where: { email: dto.email } });
-    if (existing) throw new ConflictException('Email already on waitlist');
+    const existing = await this.waitlistRepo.findOne({
+      where: { email: dto.email },
+    });
+    if (existing) throw new ConflictException("Email already on waitlist");
 
     const entry = this.waitlistRepo.create(dto);
     return this.waitlistRepo.save(entry);

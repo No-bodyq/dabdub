@@ -1,11 +1,12 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { v4 as uuidv4 } from 'uuid';
-import * as QRCode from 'qrcode';
-import { Payment, PaymentStatus } from './entities/payment.entity';
-import { CreatePaymentDto } from './dto/create-payment.dto';
-import { StellarService } from '../stellar/stellar.service';
+import { Injectable, NotFoundException } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { v4 as uuidv4 } from "uuid";
+import * as QRCode from "qrcode";
+import { Payment, PaymentStatus } from "./entities/payment.entity";
+import { CreatePaymentDto } from "./dto/create-payment.dto";
+import { StellarService } from "../stellar/stellar.service";
+import { NotificationsService } from "../notifications/notifications.service";
 
 @Injectable()
 export class PaymentsService {
@@ -13,6 +14,7 @@ export class PaymentsService {
     @InjectRepository(Payment)
     private paymentsRepo: Repository<Payment>,
     private stellar: StellarService,
+    private notificationsService: NotificationsService,
   ) {}
 
   async create(merchantId: string, dto: CreatePaymentDto): Promise<Payment> {
@@ -44,13 +46,24 @@ export class PaymentsService {
       status: PaymentStatus.PENDING,
     });
 
-    return this.paymentsRepo.save(payment);
+    const savedPayment = await this.paymentsRepo.save(payment);
+
+    if (savedPayment.customerEmail) {
+      void this.notificationsService.enqueueEmail({
+        recipient: savedPayment.customerEmail,
+        subject: "Your payment is pending",
+        text: `Your payment ${savedPayment.reference} has been created and is pending confirmation.`,
+        html: `<p>Your payment <strong>${savedPayment.reference}</strong> has been created and is pending confirmation.</p>`,
+      });
+    }
+
+    return savedPayment;
   }
 
   async findAll(merchantId: string, page = 1, limit = 20) {
     const [payments, total] = await this.paymentsRepo.findAndCount({
       where: { merchantId },
-      order: { createdAt: 'DESC' },
+      order: { createdAt: "DESC" },
       skip: (page - 1) * limit,
       take: limit,
     });
@@ -59,25 +72,27 @@ export class PaymentsService {
   }
 
   async findOne(id: string, merchantId: string): Promise<Payment> {
-    const payment = await this.paymentsRepo.findOne({ where: { id, merchantId } });
-    if (!payment) throw new NotFoundException('Payment not found');
+    const payment = await this.paymentsRepo.findOne({
+      where: { id, merchantId },
+    });
+    if (!payment) throw new NotFoundException("Payment not found");
     return payment;
   }
 
   async findByReference(reference: string): Promise<Payment> {
     const payment = await this.paymentsRepo.findOne({ where: { reference } });
-    if (!payment) throw new NotFoundException('Payment not found');
+    if (!payment) throw new NotFoundException("Payment not found");
     return payment;
   }
 
   async getStats(merchantId: string) {
     const result = await this.paymentsRepo
-      .createQueryBuilder('payment')
-      .select('payment.status', 'status')
-      .addSelect('COUNT(*)', 'count')
-      .addSelect('SUM(payment.amountUsd)', 'totalUsd')
-      .where('payment.merchantId = :merchantId', { merchantId })
-      .groupBy('payment.status')
+      .createQueryBuilder("payment")
+      .select("payment.status", "status")
+      .addSelect("COUNT(*)", "count")
+      .addSelect("SUM(payment.amountUsd)", "totalUsd")
+      .where("payment.merchantId = :merchantId", { merchantId })
+      .groupBy("payment.status")
       .getRawMany();
 
     return result;

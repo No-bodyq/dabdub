@@ -5,20 +5,20 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   OneToMany,
-} from 'typeorm';
-import { Payment } from '../../payments/entities/payment.entity';
-import { Settlement } from '../../settlements/entities/settlement.entity';
-import { Webhook } from '../../webhooks/entities/webhook.entity';
+} from "typeorm";
+import { Payment } from "../../payments/entities/payment.entity";
+import { Settlement } from "../../settlements/entities/settlement.entity";
+import { Webhook } from "../../webhooks/entities/webhook.entity";
 
 export enum MerchantStatus {
-  ACTIVE = 'active',
-  SUSPENDED = 'suspended',
-  PENDING = 'pending',
+  ACTIVE = "active",
+  SUSPENDED = "suspended",
+  PENDING = "pending",
 }
 
-@Entity('merchants')
+@Entity("merchants")
 export class Merchant {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryGeneratedColumn("uuid")
   id: string;
 
   @Column({ unique: true })
@@ -45,7 +45,11 @@ export class Merchant {
   @Column({ nullable: true })
   bankName: string;
 
-  @Column({ type: 'enum', enum: MerchantStatus, default: MerchantStatus.PENDING })
+  @Column({
+    type: "enum",
+    enum: MerchantStatus,
+    default: MerchantStatus.PENDING,
+  })
   status: MerchantStatus;
 
   @Column({ nullable: true })
@@ -54,10 +58,10 @@ export class Merchant {
   @Column({ nullable: true })
   apiKeyHash: string;
 
-  @Column({ type: 'decimal', precision: 18, scale: 6, default: 0 })
+  @Column({ type: "decimal", precision: 18, scale: 6, default: 0 })
   totalVolumeUsd: number;
 
-  @Column({ type: 'decimal', precision: 5, scale: 4, default: 0.015 })
+  @Column({ type: "decimal", precision: 5, scale: 4, default: 0.015 })
   feeRate: number;
 
   @OneToMany(() => Payment, (payment) => payment.merchant)

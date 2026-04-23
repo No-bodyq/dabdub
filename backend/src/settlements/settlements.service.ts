@@ -1,11 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { ConfigService } from '@nestjs/config';
-import axios from 'axios';
-import { Settlement, SettlementStatus } from './entities/settlement.entity';
-import { Payment, PaymentStatus } from '../payments/entities/payment.entity';
-import { WebhooksService } from '../webhooks/webhooks.service';
+import { Injectable, Logger } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { ConfigService } from "@nestjs/config";
+import axios from "axios";
+import { Settlement, SettlementStatus } from "./entities/settlement.entity";
+import { Payment, PaymentStatus } from "../payments/entities/payment.entity";
+import { WebhooksService } from "../webhooks/webhooks.service";
 
 @Injectable()
 export class SettlementsService {
@@ -30,7 +30,7 @@ export class SettlementsService {
       totalAmountUsd: payment.amountUsd,
       feeAmountUsd: feeUsd,
       netAmountUsd: netUsd,
-      fiatCurrency: 'NGN',
+      fiatCurrency: "NGN",
       status: SettlementStatus.PROCESSING,
     });
 
@@ -41,7 +41,7 @@ export class SettlementsService {
     payment.settlementId = saved.id;
     await this.paymentsRepo.save(payment);
 
-    await this.webhooks.dispatch(payment.merchantId, 'payment.settling', {
+    await this.webhooks.dispatch(payment.merchantId, "payment.settling", {
       paymentId: payment.id,
       settlementId: saved.id,
     });
@@ -49,16 +49,19 @@ export class SettlementsService {
     await this.executeFiatTransfer(saved, payment);
   }
 
-  private async executeFiatTransfer(settlement: Settlement, payment: Payment): Promise<void> {
-    const partnerUrl = this.config.get('PARTNER_API_URL');
-    const partnerKey = this.config.get('PARTNER_API_KEY');
+  private async executeFiatTransfer(
+    settlement: Settlement,
+    payment: Payment,
+  ): Promise<void> {
+    const partnerUrl = this.config.get("PARTNER_API_URL");
+    const partnerKey = this.config.get("PARTNER_API_KEY");
 
     try {
       const response = await axios.post(
         `${partnerUrl}/transfers`,
         {
           amount: settlement.netAmountUsd,
-          currency: 'USD',
+          currency: "USD",
           merchantId: settlement.merchantId,
           reference: settlement.id,
         },
@@ -73,7 +76,7 @@ export class SettlementsService {
       payment.status = PaymentStatus.SETTLED;
       await this.paymentsRepo.save(payment);
 
-      await this.webhooks.dispatch(settlement.merchantId, 'payment.settled', {
+      await this.webhooks.dispatch(settlement.merchantId, "payment.settled", {
         paymentId: payment.id,
         settlementId: settlement.id,
         amount: settlement.netAmountUsd,
@@ -88,7 +91,7 @@ export class SettlementsService {
       payment.status = PaymentStatus.FAILED;
       await this.paymentsRepo.save(payment);
 
-      await this.webhooks.dispatch(settlement.merchantId, 'payment.failed', {
+      await this.webhooks.dispatch(settlement.merchantId, "payment.failed", {
         paymentId: payment.id,
         reason: err.message,
       });
@@ -98,7 +101,7 @@ export class SettlementsService {
   async findAll(merchantId: string, page = 1, limit = 20) {
     const [settlements, total] = await this.settlementsRepo.findAndCount({
       where: { merchantId },
-      order: { createdAt: 'DESC' },
+      order: { createdAt: "DESC" },
       skip: (page - 1) * limit,
       take: limit,
     });

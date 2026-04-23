@@ -1,11 +1,18 @@
-import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import * as bcrypt from 'bcrypt';
-import { Merchant, MerchantStatus } from '../merchants/entities/merchant.entity';
-import { RegisterDto } from './dto/register.dto';
-import { LoginDto } from './dto/login.dto';
+import {
+  Injectable,
+  UnauthorizedException,
+  ConflictException,
+} from "@nestjs/common";
+import { JwtService } from "@nestjs/jwt";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import * as bcrypt from "bcrypt";
+import {
+  Merchant,
+  MerchantStatus,
+} from "../merchants/entities/merchant.entity";
+import { RegisterDto } from "./dto/register.dto";
+import { LoginDto } from "./dto/login.dto";
 
 @Injectable()
 export class AuthService {
@@ -16,8 +23,10 @@ export class AuthService {
   ) {}
 
   async register(dto: RegisterDto) {
-    const existing = await this.merchantsRepo.findOne({ where: { email: dto.email } });
-    if (existing) throw new ConflictException('Email already registered');
+    const existing = await this.merchantsRepo.findOne({
+      where: { email: dto.email },
+    });
+    if (existing) throw new ConflictException("Email already registered");
 
     const passwordHash = await bcrypt.hash(dto.password, 12);
 
@@ -37,11 +46,13 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
-    const merchant = await this.merchantsRepo.findOne({ where: { email: dto.email } });
-    if (!merchant) throw new UnauthorizedException('Invalid credentials');
+    const merchant = await this.merchantsRepo.findOne({
+      where: { email: dto.email },
+    });
+    if (!merchant) throw new UnauthorizedException("Invalid credentials");
 
     const valid = await bcrypt.compare(dto.password, merchant.passwordHash);
-    if (!valid) throw new UnauthorizedException('Invalid credentials');
+    if (!valid) throw new UnauthorizedException("Invalid credentials");
 
     const token = this.signToken(merchant.id, merchant.email);
     return { accessToken: token, merchant: this.sanitize(merchant) };
@@ -52,7 +63,7 @@ export class AuthService {
   }
 
   private sanitize(merchant: Merchant) {
-    const { passwordHash, apiKeyHash, ...rest } = merchant;
+    const { passwordHash: _, apiKeyHash: __, ...rest } = merchant; // eslint-disable-line @typescript-eslint/no-unused-vars
     return rest;
   }
 }
