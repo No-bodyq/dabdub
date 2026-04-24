@@ -2,14 +2,16 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AdminService } from './admin.service';
 import { AdminController } from './admin.controller';
+import { CronAdminController } from './cron-admin.controller';
 import { Merchant } from '../merchants/entities/merchant.entity';
 import { Payment } from '../payments/entities/payment.entity';
 import { FeeConfig } from '../fee-config/entities/fee-config.entity';
 import { FeeHistory } from '../fee-config/entities/fee-history.entity';
+import { CronModule } from '../cron/cron.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Merchant, Payment, FeeConfig, FeeHistory])],
-  controllers: [AdminController],
+  imports: [TypeOrmModule.forFeature([Merchant, Payment, FeeConfig, FeeHistory]), CronModule],
+  controllers: [AdminController, CronAdminController],
   providers: [AdminService],
   exports: [AdminService],
 })

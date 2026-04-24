@@ -1,6 +1,6 @@
 import { BullModule } from '@nestjs/bull';
 import { Module } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR, APP_FILTER } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -22,6 +22,10 @@ import { WaitlistModule } from './waitlist/waitlist.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
 import { AppThrottlerGuard } from './auth/guards/throttler.guard';
 import { EmailModule } from './email/email.module';
+import { SentryInterceptor } from './common/interceptors/sentry.interceptor';
+import { SentryExceptionFilter } from './common/filters/sentry-exception.filter';
+import { SentryModule } from './sentry/sentry.module';
+import { CronModule } from './cron/cron.module';
 
 @Module({
   imports: [
@@ -72,6 +76,8 @@ import { EmailModule } from './email/email.module';
       inject: [ConfigService],
     }),
     HealthModule,
+    SentryModule,
+    CronModule,
     EmailModule,
     AdminModule,
     AmlModule,
@@ -92,6 +98,14 @@ import { EmailModule } from './email/email.module';
     {
       provide: APP_GUARD,
       useClass: AppThrottlerGuard,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: SentryInterceptor,
+    },
+    {
+      provide: APP_FILTER,
+      useClass: SentryExceptionFilter,
     },
   ],
 })

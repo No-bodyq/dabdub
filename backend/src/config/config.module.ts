@@ -12,6 +12,7 @@ import { r2Config } from './r2.config';
 import { flutterwaveConfig } from './flutterwave.config';
 import { paystackConfig } from './paystack.config';
 import { firebaseConfig } from './firebase.config';
+import { sentryConfig } from './sentry.config';
 
 /**
  * Combined Joi validation schema for all environment variables.
@@ -87,13 +88,6 @@ const validationSchema = Joi.object({
     'any.required': 'STELLAR_ADMIN_SECRET_KEY is required',
     'string.min': 'STELLAR_ADMIN_SECRET_KEY must be at least 32 characters',
   }),
-  STELLAR_ADMIN_SECRET_KEY: Joi.string()
-    .min(32)
-    .required()
-    .messages({
-      'any.required': 'STELLAR_ADMIN_SECRET_KEY is required',
-      'string.min': 'STELLAR_ADMIN_SECRET_KEY must be at least 32 characters',
-    }),
   STELLAR_RECEIVE_ADDRESS: Joi.string()
     .length(56)
     .pattern(/^G[A-Z2-7]{55}$/)
@@ -154,6 +148,11 @@ const validationSchema = Joi.object({
     .required()
     .messages({ 'any.required': 'PAYSTACK_SECRET_KEY is required' }),
   PAYSTACK_BASE_URL: Joi.string().uri().default('https://api.paystack.co'),
+
+  // ── Sentry ─────────────────────────────────────────────────────────────────
+  SENTRY_DSN: Joi.string().uri().optional(),
+  SENTRY_TRACES_SAMPLE_RATE: Joi.number().min(0).max(1).default(0.1),
+  SENTRY_PROFILES_SAMPLE_RATE: Joi.number().min(0).max(1).default(0.05),
 });
 
 @Module({
@@ -172,6 +171,7 @@ const validationSchema = Joi.object({
         flutterwaveConfig,
         paystackConfig,
         firebaseConfig,
+        sentryConfig,
       ],
       validationSchema,
       validationOptions: { abortEarly: false },
@@ -179,3 +179,4 @@ const validationSchema = Joi.object({
   ],
 })
 export class AppConfigModule {}
+

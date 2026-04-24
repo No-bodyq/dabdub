@@ -149,4 +149,28 @@ export class AdminController {
   resetSandboxData(@Param('id') id: string) {
     return this.adminService.resetSandboxData(id);
   }
+
+  @Get('fees')
+  @Roles(AdminRole.ADMIN, AdminRole.SUPERADMIN)
+  @ApiOperation({ summary: 'List all global fee configurations' })
+  async getFees() {
+    return this.adminService.getGlobalFees();
+  }
+
+  @Patch('fees')
+  @Roles(AdminRole.ADMIN, AdminRole.SUPERADMIN)
+  @Audit({ action: 'fee.update', resourceType: 'fee-config' })
+  @ApiOperation({ summary: 'Update a global fee rate' })
+  async updateFee(
+    @Body() dto: { feeType: string; newRate: string; reason?: string },
+    @Req() req: any,
+  ) {
+    const adminId = req.user.id;
+    return this.adminService.updateGlobalFee(
+      dto.feeType as any,
+      dto.newRate,
+      adminId,
+      dto.reason,
+    );
+  }
 }
