@@ -96,6 +96,9 @@ export class Merchant {
   @Column({ nullable: true, type: 'text' })
   allowedIps: string | null;
 
+  @Column({ default: true })
+  paymentConfirmedEmailEnabled: boolean;
+
   @OneToMany(() => Payment, (payment) => payment.merchant)
   payments: Payment[];
 
