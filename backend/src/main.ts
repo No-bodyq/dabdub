@@ -15,6 +15,22 @@ async function bootstrap(): Promise<void> {
   startTelemetry(readTelemetryConfig());
   const app = await NestFactory.create(AppModule, { rawBody: true });
 
+  // Security headers — helmet must be applied before routes are registered
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"], // allow Swagger UI
+          styleSrc: ["'self'", "'unsafe-inline'"],
+          imgSrc: ["'self'", 'data:', 'validator.swagger.io'],
+          connectSrc: ["'self'"],
+        },
+      },
+      hsts: { maxAge: 31536000, includeSubDomains: true },
+    }),
+  );
+
   // Initialize Sentry before other middleware so it can capture bootstrap errors
   const sentryService = app.get(SentryService);
   sentryService.init();
