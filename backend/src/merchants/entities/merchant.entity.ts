@@ -20,6 +20,7 @@ export enum MerchantStatus {
 export enum MerchantRole {
   ADMIN = 'admin',
   MERCHANT = 'merchant',
+  SUPERADMIN = 'superadmin',
 }
 
 @Entity('merchants')
@@ -82,6 +83,18 @@ export class Merchant {
     default: null,
   })
   customFeeRate: string | null;
+
+  @Column({ default: false })
+  sandboxMode: boolean;
+
+  @Column({ nullable: true })
+  totpSecret: string | null;
+
+  @Column({ default: false })
+  totpEnabled: boolean;
+
+  @Column({ nullable: true, type: 'text' })
+  allowedIps: string | null;
 
   @OneToMany(() => Payment, (payment) => payment.merchant)
   payments: Payment[];

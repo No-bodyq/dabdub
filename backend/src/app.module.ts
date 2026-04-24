@@ -21,6 +21,7 @@ import { StellarModule } from './stellar/stellar.module';
 import { WaitlistModule } from './waitlist/waitlist.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
 import { AppThrottlerGuard } from './auth/guards/throttler.guard';
+import { EmailModule } from './email/email.module';
 
 @Module({
   imports: [
@@ -71,6 +72,7 @@ import { AppThrottlerGuard } from './auth/guards/throttler.guard';
       inject: [ConfigService],
     }),
     HealthModule,
+    EmailModule,
     AdminModule,
     AmlModule,
     MerchantAnalyticsModule,

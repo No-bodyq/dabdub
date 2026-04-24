@@ -1,4 +1,15 @@
-import { Controller, Get, Patch, Body, Param, Query, Req, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Body,
+  Param,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { Request } from 'express';
 import { AdminService } from './admin.service';
@@ -63,5 +74,79 @@ export class AdminController {
       req.user.id,
       dto.reason,
     );
+  }
+
+  // ── Geographic Distribution Analytics (#714) ───────────────────────────────
+
+  @Get('analytics/geography')
+  @ApiOperation({ summary: 'Get geographic distribution of merchants and payments' })
+  getGeographicDistribution(@Query('sortBy') sortBy = 'volume') {
+    return this.adminService.getGeographicDistribution(sortBy);
+  }
+
+  // ── Admin User Management with 2FA (#707) ──────────────────────────────────
+
+  @Post('users')
+  @ApiOperation({ summary: 'Create a new admin user (SUPERADMIN only)' })
+  createAdmin(
+    @Body() dto: { email: string; password: string; businessName: string },
+    @Req() req: Request & { user: { id: string; role: MerchantRole } },
+  ) {
+    return this.adminService.createAdmin(
+      dto.email,
+      dto.password,
+      dto.businessName,
+      req.user.role,
+    );
+  }
+
+  @Delete('users/:id')
+  @ApiOperation({ summary: 'Delete an admin user (SUPERADMIN only)' })
+  deleteAdmin(
+    @Param('id') id: string,
+    @Req() req: Request & { user: { id: string; role: MerchantRole } },
+  ) {
+    return this.adminService.deleteAdmin(id, req.user.role);
+  }
+
+  @Post('users/:id/2fa/setup')
+  @ApiOperation({ summary: 'Generate a TOTP secret for an admin user' })
+  setupAdminTotp(@Param('id') id: string) {
+    return this.adminService.setupAdminTotp(id);
+  }
+
+  @Post('users/:id/2fa/verify')
+  @ApiOperation({ summary: 'Verify a TOTP token and enable 2FA for an admin user' })
+  verifyAdminTotp(
+    @Param('id') id: string,
+    @Body('token') token: string,
+  ) {
+    return this.adminService.verifyAdminTotp(id, token);
+  }
+
+  @Patch('users/:id/allowed-ips')
+  @ApiOperation({ summary: 'Update the IP allowlist for an admin user' })
+  updateAdminAllowedIps(
+    @Param('id') id: string,
+    @Body('ips') ips: string[],
+  ) {
+    return this.adminService.updateAdminAllowedIps(id, ips);
+  }
+
+  // ── Sandbox Environment Management (#708) ──────────────────────────────────
+
+  @Patch('merchants/:id/sandbox')
+  @ApiOperation({ summary: 'Enable or disable sandbox mode for a merchant' })
+  toggleSandboxMode(
+    @Param('id') id: string,
+    @Body('enabled') enabled: boolean,
+  ) {
+    return this.adminService.toggleSandboxMode(id, enabled);
+  }
+
+  @Post('merchants/:id/sandbox/reset')
+  @ApiOperation({ summary: 'Delete all sandbox payment data for a merchant' })
+  resetSandboxData(@Param('id') id: string) {
+    return this.adminService.resetSandboxData(id);
   }
 }
