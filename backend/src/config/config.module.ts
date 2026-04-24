@@ -34,7 +34,7 @@ const validationSchema = Joi.object({
   THROTTLE_TTL: Joi.number().integer().positive().default(60),
   THROTTLE_LIMIT: Joi.number().integer().positive().default(100),
   FRONTEND_URL: Joi.string()
-    .uri()
+    .uri({ scheme: ['https'] })
     .required()
     .messages({ 'any.required': 'FRONTEND_URL is required' }),
 
@@ -86,7 +86,7 @@ const validationSchema = Joi.object({
 
   // ── Stellar ──────────────────────────────────────────────────────────────
   STELLAR_RPC_URL: Joi.string()
-    .uri()
+    .uri({ scheme: ['https'] })
     .required()
     .messages({ 'any.required': 'STELLAR_RPC_URL is required' }),
   STELLAR_NETWORK: Joi.string()
@@ -146,7 +146,7 @@ const validationSchema = Joi.object({
     .required()
     .messages({ 'any.required': 'R2_BUCKET_NAME is required' }),
   R2_PUBLIC_DOMAIN: Joi.string()
-    .uri()
+    .uri({ scheme: ['https'] })
     .required()
     .messages({ 'any.required': 'R2_PUBLIC_DOMAIN is required (public bucket CDN URL)' }),
 
@@ -158,7 +158,7 @@ const validationSchema = Joi.object({
     .required()
     .messages({ 'any.required': 'FLUTTERWAVE_WEBHOOK_SECRET is required' }),
   FLUTTERWAVE_BASE_URL: Joi.string()
-    .uri()
+    .uri({ scheme: ['https'] })
     .default('https://api.flutterwave.com'),
 
   // ── Firebase ─────────────────────────────────────────────────────────────
@@ -177,14 +177,14 @@ const validationSchema = Joi.object({
   PAYSTACK_SECRET_KEY: Joi.string()
     .required()
     .messages({ 'any.required': 'PAYSTACK_SECRET_KEY is required' }),
-  PAYSTACK_BASE_URL: Joi.string().uri().default('https://api.paystack.co'),
+  PAYSTACK_BASE_URL: Joi.string().uri({ scheme: ['https'] }).default('https://api.paystack.co'),
 
   // ── Sudo Africa ────────────────────────────────────────────────────────────
   SUDO_AFRICA_API_KEY: Joi.string()
     .required()
     .messages({ 'any.required': 'SUDO_AFRICA_API_KEY is required' }),
   SUDO_AFRICA_BASE_URL: Joi.string()
-    .uri()
+    .uri({ scheme: ['https'] })
     .default('https://api.sudoafrica.com/v1'),
   SUDO_AFRICA_WEBHOOK_SECRET: Joi.string()
     .required()
@@ -198,7 +198,7 @@ const validationSchema = Joi.object({
     .required()
     .messages({ 'any.required': 'PREMBLY_APP_ID is required' }),
   PREMBLY_BASE_URL: Joi.string()
-    .uri()
+    .uri({ scheme: ['https'] })
     .default('https://api.prembly.com/identitypass/verification'),
 
   // ── Deep Linking ─────────────────────────────────────────────────────────

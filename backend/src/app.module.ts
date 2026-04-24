@@ -70,6 +70,8 @@ import { SentryModule as SentryUserContextModule } from './sentry/sentry.module'
 import { SentryUserMiddleware } from './sentry/sentry-user.middleware';
 import { PwaModule } from './pwa/pwa.module';
 import { SecurityHeadersMiddleware } from './security/security-headers.middleware';
+import { SensitiveAccessLogMiddleware } from './security/sensitive-access.middleware';
+import { TlsEnforcementMiddleware } from './security/tls-enforcement.middleware';
 import { ComplianceModule } from './compliance/compliance.module';
 import { DisputesModule } from './disputes/disputes.module';
 import { UsernameModule } from './username/username.module';
@@ -282,5 +284,7 @@ export class AppModule implements NestModule {
     consumer.apply(MaintenanceWindowMiddleware).forRoutes('*');
     consumer.apply(SentryUserMiddleware).forRoutes('*');
     consumer.apply(SecurityHeadersMiddleware).forRoutes('*');
+    consumer.apply(TlsEnforcementMiddleware).forRoutes('*');
+    consumer.apply(SensitiveAccessLogMiddleware).forRoutes('*');
   }
 }
