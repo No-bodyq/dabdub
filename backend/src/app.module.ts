@@ -93,6 +93,7 @@ import { CronModule } from './cron/cron.module';
     WebhooksModule,
     WaitlistModule,
     QueueModule,
+    AuditModule,
   ],
   providers: [
     {
