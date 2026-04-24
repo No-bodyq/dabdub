@@ -5,6 +5,8 @@ use soroban_sdk::{
     testutils::Address as _, testutils::Ledger, token, Address, BytesN, Env, String,
 };
 
+const DEFAULT_PAYMENT_TTL: u32 = 100;
+
 fn setup_env() -> (
     Env,
     PaymentEscrowContractClient<'static>,
@@ -25,7 +27,7 @@ fn setup_env() -> (
     let asset_contract = env.register_stellar_asset_contract_v2(token_admin);
     let usdc = asset_contract.address();
 
-    let contract_id = env.register(PaymentEscrowContract, (&admin, &usdc, &100u32));
+    let contract_id = env.register(PaymentEscrowContract, (&admin, &usdc, &DEFAULT_PAYMENT_TTL));
     let client = PaymentEscrowContractClient::new(&env, &contract_id);
 
     let token_admin_client = token::StellarAssetClient::new(&env, &usdc);
@@ -38,13 +40,29 @@ fn make_id(env: &Env, seed: u8) -> BytesN<32> {
     BytesN::from_array(env, &[seed; 32])
 }
 
+fn deposit_default_ttl(
+    client: &PaymentEscrowContractClient<'_>,
+    customer: &Address,
+    payment_id: &BytesN<32>,
+    merchant: &Address,
+    amount: i128,
+) {
+    client.deposit(
+        customer,
+        payment_id,
+        merchant,
+        &amount,
+        &DEFAULT_PAYMENT_TTL,
+    );
+}
+
 #[test]
 fn test_constructor() {
     let (_env, client, _contract_id, admin, _customer, _merchant, usdc) = setup_env();
 
     assert_eq!(client.get_admin(), admin);
     assert_eq!(client.get_usdc_token(), usdc);
-    assert_eq!(client.get_default_ttl_ledgers(), 100);
+    assert_eq!(client.get_default_ttl_ledgers(), DEFAULT_PAYMENT_TTL);
 }
 
 #[test]
@@ -52,7 +70,13 @@ fn test_deposit_happy_path() {
     let (env, client, contract_id, _admin, customer, merchant, usdc) = setup_env();
     let payment_id = make_id(&env, 1);
 
-    let result = client.deposit(&customer, &payment_id, &merchant, &250_000_000i128);
+    let result = client.deposit(
+        &customer,
+        &payment_id,
+        &merchant,
+        &250_000_000i128,
+        &DEFAULT_PAYMENT_TTL,
+    );
     let payment = client.get_payment(&payment_id);
 
     assert_eq!(result, payment_id);
@@ -64,6 +88,7 @@ fn test_deposit_happy_path() {
     assert_eq!(payment.dispute_window_end, 110);
     assert_eq!(payment.dispute_reason, None);
     assert_eq!(client.get_balance(&payment_id), 250_000_000);
+    assert_eq!(client.get_expiry(&payment_id), 110);
 
     let token_client = token::Client::new(&env, &usdc);
     assert_eq!(token_client.balance(&customer), 750_000_000);
@@ -76,8 +101,8 @@ fn test_deposit_duplicate_payment_id() {
     let (env, client, _contract_id, _admin, customer, merchant, _usdc) = setup_env();
     let payment_id = make_id(&env, 1);
 
-    client.deposit(&customer, &payment_id, &merchant, &250_000_000i128);
-    client.deposit(&customer, &payment_id, &merchant, &250_000_000i128);
+    deposit_default_ttl(&client, &customer, &payment_id, &merchant, 250_000_000i128);
+    deposit_default_ttl(&client, &customer, &payment_id, &merchant, 250_000_000i128);
 }
 
 #[test]
@@ -85,7 +110,68 @@ fn test_deposit_duplicate_payment_id() {
 fn test_deposit_zero_amount() {
     let (env, client, _contract_id, _admin, customer, merchant, _usdc) = setup_env();
 
-    client.deposit(&customer, &make_id(&env, 1), &merchant, &0i128);
+    client.deposit(
+        &customer,
+        &make_id(&env, 1),
+        &merchant,
+        &0i128,
+        &DEFAULT_PAYMENT_TTL,
+    );
+}
+
+#[test]
+#[should_panic(expected = "TTL must be > 0")]
+fn test_deposit_zero_ttl() {
+    let (env, client, _contract_id, _admin, customer, merchant, _usdc) = setup_env();
+
+    client.deposit(
+        &customer,
+        &make_id(&env, 1),
+        &merchant,
+        &250_000_000i128,
+        &0u32,
+    );
+}
+
+#[test]
+#[should_panic(expected = "TTL exceeds maximum")]
+fn test_deposit_excessive_ttl() {
+    let (env, client, _contract_id, _admin, customer, merchant, _usdc) = setup_env();
+    let ttl = client.get_max_ttl_ledgers() + 1;
+
+    client.deposit(
+        &customer,
+        &make_id(&env, 1),
+        &merchant,
+        &250_000_000i128,
+        &ttl,
+    );
+}
+
+#[test]
+fn test_get_expiry_with_short_ttl() {
+    let (env, client, _contract_id, _admin, customer, merchant, _usdc) = setup_env();
+    let payment_id = make_id(&env, 1);
+
+    client.deposit(&customer, &payment_id, &merchant, &250_000_000i128, &5u32);
+
+    assert_eq!(client.get_expiry(&payment_id), 15);
+}
+
+#[test]
+fn test_get_expiry_with_long_ttl() {
+    let (env, client, _contract_id, _admin, customer, merchant, _usdc) = setup_env();
+    let payment_id = make_id(&env, 1);
+
+    client.deposit(
+        &customer,
+        &payment_id,
+        &merchant,
+        &250_000_000i128,
+        &2_000u32,
+    );
+
+    assert_eq!(client.get_expiry(&payment_id), 2_010);
 }
 
 #[test]
@@ -93,7 +179,7 @@ fn test_release_happy_path() {
     let (env, client, contract_id, admin, customer, merchant, usdc) = setup_env();
     let payment_id = make_id(&env, 1);
 
-    client.deposit(&customer, &payment_id, &merchant, &250_000_000i128);
+    deposit_default_ttl(&client, &customer, &payment_id, &merchant, 250_000_000i128);
     client.release(&admin, &payment_id);
 
     let payment = client.get_payment(&payment_id);
@@ -112,7 +198,7 @@ fn test_release_unauthorized() {
     let payment_id = make_id(&env, 1);
     let random = Address::generate(&env);
 
-    client.deposit(&customer, &payment_id, &merchant, &250_000_000i128);
+    deposit_default_ttl(&client, &customer, &payment_id, &merchant, 250_000_000i128);
     client.release(&random, &payment_id);
 }
 
@@ -130,7 +216,7 @@ fn test_release_expired_payment() {
     let (env, client, _contract_id, admin, customer, merchant, _usdc) = setup_env();
     let payment_id = make_id(&env, 1);
 
-    client.deposit(&customer, &payment_id, &merchant, &250_000_000i128);
+    deposit_default_ttl(&client, &customer, &payment_id, &merchant, 250_000_000i128);
     env.ledger().set_sequence_number(111);
 
     client.release(&admin, &payment_id);
@@ -142,7 +228,7 @@ fn test_release_already_settled_payment() {
     let (env, client, _contract_id, admin, customer, merchant, _usdc) = setup_env();
     let payment_id = make_id(&env, 1);
 
-    client.deposit(&customer, &payment_id, &merchant, &250_000_000i128);
+    deposit_default_ttl(&client, &customer, &payment_id, &merchant, 250_000_000i128);
     client.release(&admin, &payment_id);
     client.release(&admin, &payment_id);
 }
@@ -152,9 +238,9 @@ fn test_expire_refunds_customer() {
     let (env, client, contract_id, _admin, customer, merchant, usdc) = setup_env();
     let payment_id = make_id(&env, 1);
 
-    client.deposit(&customer, &payment_id, &merchant, &250_000_000i128);
+    deposit_default_ttl(&client, &customer, &payment_id, &merchant, 250_000_000i128);
     env.ledger().set_sequence_number(111);
-    client.expire(&payment_id);
+    client.refund(&payment_id);
 
     let payment = client.get_payment(&payment_id);
     assert_eq!(payment.status, PaymentStatus::Expired);
@@ -171,7 +257,7 @@ fn test_expire_before_ttl() {
     let (env, client, _contract_id, _admin, customer, merchant, _usdc) = setup_env();
     let payment_id = make_id(&env, 1);
 
-    client.deposit(&customer, &payment_id, &merchant, &250_000_000i128);
+    deposit_default_ttl(&client, &customer, &payment_id, &merchant, 250_000_000i128);
     client.expire(&payment_id);
 }
 
@@ -180,7 +266,7 @@ fn test_dispute_by_customer() {
     let (env, client, _contract_id, _admin, customer, merchant, _usdc) = setup_env();
     let payment_id = make_id(&env, 1);
 
-    client.deposit(&customer, &payment_id, &merchant, &250_000_000i128);
+    deposit_default_ttl(&client, &customer, &payment_id, &merchant, 250_000_000i128);
     client.dispute(
         &customer,
         &payment_id,
@@ -200,7 +286,7 @@ fn test_dispute_by_merchant() {
     let (env, client, _contract_id, _admin, customer, merchant, _usdc) = setup_env();
     let payment_id = make_id(&env, 1);
 
-    client.deposit(&customer, &payment_id, &merchant, &250_000_000i128);
+    deposit_default_ttl(&client, &customer, &payment_id, &merchant, 250_000_000i128);
     client.dispute(
         &merchant,
         &payment_id,
@@ -218,7 +304,7 @@ fn test_dispute_unauthorized_caller() {
     let payment_id = make_id(&env, 1);
     let random = Address::generate(&env);
 
-    client.deposit(&customer, &payment_id, &merchant, &250_000_000i128);
+    deposit_default_ttl(&client, &customer, &payment_id, &merchant, 250_000_000i128);
     client.dispute(&random, &payment_id, &String::from_str(&env, "not allowed"));
 }
 
@@ -228,7 +314,7 @@ fn test_duplicate_dispute_rejected() {
     let (env, client, _contract_id, _admin, customer, merchant, _usdc) = setup_env();
     let payment_id = make_id(&env, 1);
 
-    client.deposit(&customer, &payment_id, &merchant, &250_000_000i128);
+    deposit_default_ttl(&client, &customer, &payment_id, &merchant, 250_000_000i128);
     client.dispute(&customer, &payment_id, &String::from_str(&env, "first"));
     client.dispute(&merchant, &payment_id, &String::from_str(&env, "second"));
 }
@@ -239,7 +325,7 @@ fn test_dispute_after_window_rejected() {
     let (env, client, _contract_id, _admin, customer, merchant, _usdc) = setup_env();
     let payment_id = make_id(&env, 1);
 
-    client.deposit(&customer, &payment_id, &merchant, &250_000_000i128);
+    deposit_default_ttl(&client, &customer, &payment_id, &merchant, 250_000_000i128);
     env.ledger().set_sequence_number(111);
     client.dispute(&customer, &payment_id, &String::from_str(&env, "too late"));
 }
@@ -250,7 +336,7 @@ fn test_release_blocked_while_disputed() {
     let (env, client, _contract_id, admin, customer, merchant, _usdc) = setup_env();
     let payment_id = make_id(&env, 1);
 
-    client.deposit(&customer, &payment_id, &merchant, &250_000_000i128);
+    deposit_default_ttl(&client, &customer, &payment_id, &merchant, 250_000_000i128);
     client.dispute(
         &customer,
         &payment_id,
@@ -265,7 +351,7 @@ fn test_expire_blocked_while_disputed() {
     let (env, client, _contract_id, _admin, customer, merchant, _usdc) = setup_env();
     let payment_id = make_id(&env, 1);
 
-    client.deposit(&customer, &payment_id, &merchant, &250_000_000i128);
+    deposit_default_ttl(&client, &customer, &payment_id, &merchant, 250_000_000i128);
     client.dispute(
         &merchant,
         &payment_id,
@@ -280,7 +366,7 @@ fn test_resolve_dispute_to_customer() {
     let (env, client, contract_id, admin, customer, merchant, usdc) = setup_env();
     let payment_id = make_id(&env, 1);
 
-    client.deposit(&customer, &payment_id, &merchant, &250_000_000i128);
+    deposit_default_ttl(&client, &customer, &payment_id, &merchant, 250_000_000i128);
     client.dispute(
         &merchant,
         &payment_id,
@@ -301,7 +387,7 @@ fn test_resolve_dispute_to_merchant() {
     let (env, client, contract_id, admin, customer, merchant, usdc) = setup_env();
     let payment_id = make_id(&env, 1);
 
-    client.deposit(&customer, &payment_id, &merchant, &250_000_000i128);
+    deposit_default_ttl(&client, &customer, &payment_id, &merchant, 250_000_000i128);
     client.dispute(
         &customer,
         &payment_id,
@@ -324,7 +410,7 @@ fn test_resolve_dispute_unauthorized() {
     let payment_id = make_id(&env, 1);
     let random = Address::generate(&env);
 
-    client.deposit(&customer, &payment_id, &merchant, &250_000_000i128);
+    deposit_default_ttl(&client, &customer, &payment_id, &merchant, 250_000_000i128);
     client.dispute(
         &customer,
         &payment_id,
@@ -340,7 +426,7 @@ fn test_resolve_dispute_invalid_winner() {
     let payment_id = make_id(&env, 1);
     let random = Address::generate(&env);
 
-    client.deposit(&customer, &payment_id, &merchant, &250_000_000i128);
+    deposit_default_ttl(&client, &customer, &payment_id, &merchant, 250_000_000i128);
     client.dispute(
         &merchant,
         &payment_id,
@@ -355,7 +441,7 @@ fn test_resolve_dispute_already_resolved() {
     let (env, client, _contract_id, admin, customer, merchant, _usdc) = setup_env();
     let payment_id = make_id(&env, 1);
 
-    client.deposit(&customer, &payment_id, &merchant, &250_000_000i128);
+    deposit_default_ttl(&client, &customer, &payment_id, &merchant, 250_000_000i128);
     client.dispute(
         &merchant,
         &payment_id,

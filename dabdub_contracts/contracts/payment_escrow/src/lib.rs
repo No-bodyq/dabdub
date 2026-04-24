@@ -75,6 +75,7 @@ struct DisputeResolvedEvent {
 }
 
 const MAX_DISPUTE_WINDOW_LEDGERS: u32 = 51_840;
+const MAX_TTL_LEDGERS: u32 = 518_400;
 
 #[contract]
 pub struct PaymentEscrowContract;
@@ -101,11 +102,18 @@ impl PaymentEscrowContract {
         payment_id: BytesN<32>,
         merchant: Address,
         amount: i128,
+        ttl_ledgers: u32,
     ) -> BytesN<32> {
         customer.require_auth();
 
         if amount <= 0 {
             panic!("Amount must be > 0");
+        }
+        if ttl_ledgers == 0 {
+            panic!("TTL must be > 0");
+        }
+        if ttl_ledgers > MAX_TTL_LEDGERS {
+            panic!("TTL exceeds maximum");
         }
 
         let key = DataKey::Payment(payment_id.clone());
@@ -117,12 +125,7 @@ impl PaymentEscrowContract {
         let token_client = token::Client::new(&env, &usdc_token);
         token_client.transfer(&customer, &env.current_contract_address(), &amount);
 
-        let default_ttl_ledgers: u32 = env
-            .storage()
-            .instance()
-            .get(&DataKey::DefaultTtlLedgers)
-            .unwrap();
-        let expiry = env.ledger().sequence().saturating_add(default_ttl_ledgers);
+        let expiry = env.ledger().sequence().saturating_add(ttl_ledgers);
         let dispute_window_end = {
             let max_window_end = env
                 .ledger()
@@ -193,6 +196,10 @@ impl PaymentEscrowContract {
     }
 
     pub fn expire(env: Env, payment_id: BytesN<32>) {
+        Self::refund(env, payment_id);
+    }
+
+    pub fn refund(env: Env, payment_id: BytesN<32>) {
         let mut payment = Self::get_payment(env.clone(), payment_id.clone());
         Self::require_expirable(&payment);
 
@@ -301,6 +308,10 @@ impl PaymentEscrowContract {
         }
     }
 
+    pub fn get_expiry(env: Env, payment_id: BytesN<32>) -> u32 {
+        Self::get_payment(env, payment_id).expiry
+    }
+
     pub fn get_admin(env: Env) -> Address {
         env.storage().instance().get(&DataKey::Admin).unwrap()
     }
@@ -318,6 +329,10 @@ impl PaymentEscrowContract {
 
     pub fn get_max_dispute_window_ledgers(_env: Env) -> u32 {
         MAX_DISPUTE_WINDOW_LEDGERS
+    }
+
+    pub fn get_max_ttl_ledgers(_env: Env) -> u32 {
+        MAX_TTL_LEDGERS
     }
 
     fn require_admin(env: &Env, caller: &Address) {
