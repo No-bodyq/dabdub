@@ -10,6 +10,7 @@ import {
   DOCUMENTED_API_VERSIONS,
 } from './api-version/api-version.policy';
 import { filterOpenApiPathsForVersion } from './api-version/filter-openapi-for-version';
+import { SentryService } from './sentry/sentry.service';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { version } = require('../package.json') as { version: string };
 
@@ -19,6 +20,10 @@ async function bootstrap(): Promise<void> {
     logger: ['error', 'warn', 'log', 'debug', 'verbose'],
   });
   app.useLogger(app.get(WINSTON_MODULE_NEST_PROVIDER));
+
+  // Initialize Sentry before other middleware so it can capture bootstrap errors
+  const sentryService = app.get(SentryService);
+  sentryService.init();
 
   const config = app.get(ConfigService);
   const port = config.get<AppConfig['port']>('app.port')!;
@@ -74,3 +79,4 @@ async function bootstrap(): Promise<void> {
 }
 
 bootstrap();
+

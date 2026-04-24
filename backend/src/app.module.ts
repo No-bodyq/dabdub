@@ -1,6 +1,7 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { APP_INTERCEPTOR } from '@nestjs/core';
+import { APP_FILTER } from '@nestjs/core';
 import { ConfigType } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { BullModule } from '@nestjs/bull';
@@ -20,6 +21,8 @@ import { LoggingModule } from './logging/logging.module';
 import { CorrelationIdMiddleware } from './logging/correlation-id.middleware';
 import { HttpLoggingInterceptor } from './logging/http-logging.interceptor';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
+import { SentryInterceptor } from './common/interceptors/sentry.interceptor';
+import { SentryExceptionFilter } from './common/filters/sentry-exception.filter';
 import { WebhooksModule } from './webhooks/webhooks.module';
 import { RbacModule } from './rbac/rbac.module';
 import { MerchantsModule } from './merchants/merchants.module';
@@ -34,6 +37,7 @@ import { MaintenanceModeMiddleware } from './app-config/middleware/maintenance-m
 import { AdminModule } from './admin/admin.module';
 import { EarningsModule } from './earnings/earnings.module';
 import { SmsModule } from './sms/sms.module';
+import { OtpModule } from './otp/otp.module';
 import { PinModule } from './pin/pin.module';
 import { TransfersModule } from './transfers/transfers.module';
 import { WithdrawalsModule } from './withdrawals/withdrawals.module';
@@ -47,6 +51,7 @@ import { ReportsModule } from './reports/reports.module';
 import { ApiVersionModule } from './api-version/api-version.module';
 import { DeprecationHeadersInterceptor } from './api-version/deprecation-headers.interceptor';
 import { CronModule } from './cron/cron.module';
+import { SentryModule } from './sentry/sentry.module';
 
 @Module({
   imports: [
@@ -58,6 +63,9 @@ import { CronModule } from './cron/cron.module';
 
     // 1b. Logging — Winston + Nest bridge.
     LoggingModule,
+
+    // 1c. Sentry — error monitoring + performance tracing.
+    SentryModule,
 
     // 2. Database — owns the TypeORM root connection; see database.module.ts.
     DatabaseModule,
@@ -179,6 +187,14 @@ import { CronModule } from './cron/cron.module';
       provide: APP_INTERCEPTOR,
       useClass: HttpLoggingInterceptor,
     },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: SentryInterceptor,
+    },
+    {
+      provide: APP_FILTER,
+      useClass: SentryExceptionFilter,
+    },
   ],
 })
 export class AppModule implements NestModule {
@@ -187,3 +203,4 @@ export class AppModule implements NestModule {
     consumer.apply(MaintenanceModeMiddleware).forRoutes('*');
   }
 }
+

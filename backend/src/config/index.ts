@@ -13,3 +13,5 @@ export {
 export { paystackConfig, type PaystackConfig } from './paystack.config';
 export { smsConfig, smsConfigValidation } from './sms.config';
 export { firebaseConfig, firebaseConfigValidation } from './firebase.config';
+export { sentryConfig, type SentryConfig } from './sentry.config';
+

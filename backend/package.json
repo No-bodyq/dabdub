@@ -40,6 +40,7 @@
     "@nestjs/throttler": "^6.5.0",
     "@nestjs/typeorm": "^11.0.0",
     "@nestjs/websockets": "^11.0.1",
+    "@sentry/nestjs": "^8.47.0",
     "@simplewebauthn/server": "^13.3.0",
     "@stellar/stellar-sdk": "^14.6.1",
     "bcrypt": "^6.0.0",
@@ -53,8 +54,8 @@
     "nest-winston": "^1.10.2",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
-    "qrcode": "^1.5.4",
     "pg": "^8.20.0",
+    "qrcode": "^1.5.4",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "socket.io": "^4.8.1",
@@ -120,3 +121,4 @@
   },
   "packageManager": "pnpm@10.30.2+sha512.36cdc707e7b7940a988c9c1ecf88d084f8514b5c3f085f53a2e244c2921d3b2545bc20dd4ebe1fc245feec463bb298aecea7a63ed1f7680b877dc6379d8d0cb4"
 }
+
