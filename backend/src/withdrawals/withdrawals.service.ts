@@ -12,6 +12,7 @@ import { Withdrawal, WithdrawalStatus } from './entities/withdrawal.entity';
 import { CreateWithdrawalDto } from './dto/create-withdrawal.dto';
 import { WithdrawalQueryDto } from './dto/withdrawal-query.dto';
 import { FeeConfig, FeeType } from '../fee-config/entities/fee-config.entity';
+import { MetricsService } from '../prometheus/metrics.service';
 
 export const WITHDRAWAL_QUEUE = 'process-withdrawal';
 export const PROCESS_WITHDRAWAL_JOB = 'process-withdrawal';
@@ -29,6 +30,8 @@ export class WithdrawalsService {
 
     @InjectQueue(WITHDRAWAL_QUEUE)
     private readonly withdrawalQueue: Queue,
+
+    private readonly metricsService: MetricsService,
   ) {}
 
   async create(userId: string, dto: CreateWithdrawalDto): Promise<Withdrawal> {
@@ -65,6 +68,8 @@ export class WithdrawalsService {
       `Withdrawal ${saved.id} created for user ${userId}: ${dto.amount} USDC → net ${netAmount} USDC`,
     );
 
+    this.metricsService.incrementPaymentCreated('withdrawal');
+
     return saved;
   }
 
@@ -92,7 +97,7 @@ export class WithdrawalsService {
 
   async computeFee(grossAmount: string): Promise<{ fee: string; netAmount: string }> {
     const config = await this.feeConfigRepo.findOne({
-      where{ feeType: FeeType.WITHDRAWAL, isActive: true },
+      where: { feeType: FeeType.WITHDRAWAL, isActive: true },
     });
 
     const gross = parseFloat(grossAmount);

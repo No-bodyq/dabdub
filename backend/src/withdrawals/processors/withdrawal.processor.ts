@@ -12,6 +12,7 @@ import { Withdrawal } from '../entities/withdrawal.entity';
 import { SorobanService } from '../../soroban/soroban.service';
 import { Transaction, TransactionType, TransactionStatus } from '../../transactions/entities/transaction.entity';
 import { NotificationsService } from '../../notifications/notifications.service';
+import { MetricsService } from '../../prometheus/metrics.service';
 
 export interface ProcessWithdrawalJobData {
   withdrawalId: string;
@@ -29,6 +30,8 @@ export class WithdrawalProcessor {
     private readonly transactionRepo: Repository<Transaction>,
 
     private readonly notificationsService: NotificationsService,
+
+    private readonly metricsService: MetricsService,
   ) {}
 
   @Process(PROCESS_WITHDRAWAL_JOB)
@@ -36,6 +39,7 @@ export class WithdrawalProcessor {
     const { withdrawalId } = job.data;
     this.logger.log(`Processing withdrawal job for ${withdrawalId}`);
 
+    const start = Date.now();
     const withdrawal = await this.withdrawalsService.markProcessing(withdrawalId);
 
     try {
@@ -63,6 +67,10 @@ export class WithdrawalProcessor {
 
       await this.notificationsService.notifyWithdrawalConfirmed(confirmed);
 
+      const duration = (Date.now() - start) / 1000;
+      this.metricsService.observeSettlementDuration('withdrawal', duration);
+      this.metricsService.incrementPaymentSettled('withdrawal');
+
       this.logger.log(`Withdrawal ${withdrawalId} confirmed. txHash=${txHash}`);
     } catch (error: unknown) {
       const reason = error instanceof Error ? error.message : String(error);
@@ -70,6 +78,10 @@ export class WithdrawalProcessor {
 
       await this.withdrawalsService.markFailed(withdrawalId, reason);
       await this.notificationsService.notifyWithdrawalFailed(withdrawal, reason);
+
+      const duration = (Date.now() - start) / 1000;
+      this.metricsService.observeSettlementDuration('withdrawal', duration);
+      this.metricsService.incrementSettlementFailed('withdrawal');
 
       throw error;
     }

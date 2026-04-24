@@ -8,6 +8,7 @@ import {
   TransactionStatus,
 } from '../transactions/entities/transaction.entity';
 import { VirtualAccount } from '../virtual-account/entities/virtual-account.entity';
+import { MetricsService } from '../prometheus/metrics.service';
 
 @Injectable()
 export class DepositsService {
@@ -18,6 +19,8 @@ export class DepositsService {
     private readonly depositRepo: Repository<Deposit>,
     @InjectRepository(Transaction)
     private readonly transactionRepo: Repository<Transaction>,
+
+    private readonly metricsService: MetricsService,
   ) {}
 
   async createDeposit(
@@ -59,6 +62,8 @@ export class DepositsService {
     this.logger.log(
       `Created deposit and transaction for user ${userId}: ${usdcAmount} USDC`,
     );
+
+    this.metricsService.incrementPaymentCreated('deposit');
 
     return savedDeposit;
   }

@@ -18,6 +18,7 @@ import {
 } from './paylink.processor';
 import { PayLinkService } from './paylink.service';
 import { PinModule } from '../pin/pin.module';
+import { PrometheusModule } from '../prometheus/prometheus.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { PinModule } from '../pin/pin.module';
     WsModule,
     EmailModule,
     NotificationsModule,
+    PrometheusModule,
   ],
   controllers: [PayLinkController],
   providers: [PayLinkService, PayLinkProcessor],

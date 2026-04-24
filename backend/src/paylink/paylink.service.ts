@@ -24,6 +24,7 @@ import { CreatePayLinkDto } from './dto/create-pay-link.dto';
 import { ListPayLinksQueryDto } from './dto/list-pay-links-query.dto';
 import { PayLinkPublicDto } from './dto/pay-link-public.dto';
 import { PayLink, PayLinkStatus } from './entities/pay-link.entity';
+import { MetricsService } from '../prometheus/metrics.service';
 
 const DEFAULT_EXPIRES_HOURS = 72;
 const PAYLINK_TOKEN_SIZE = 10;
@@ -57,6 +58,8 @@ export class PayLinkService {
     private readonly gateway: CheeseGateway,
     private readonly emailService: EmailService,
     private readonly notificationService: NotificationService,
+
+    private readonly metricsService: MetricsService,
   ) {}
 
   async countActiveReceiveLinks(creatorUserId: string): Promise<number> {
@@ -223,6 +226,8 @@ export class PayLinkService {
       },
       creator.id,
     );
+
+    this.metricsService.incrementPaymentCreated('paylink');
 
     return saved;
   }
