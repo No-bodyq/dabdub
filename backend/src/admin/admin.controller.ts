@@ -9,7 +9,7 @@ import {
   Query,
   Req,
   UseGuards,
-  Header,
+  Headers,
   Res,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
@@ -160,9 +160,9 @@ export class AdminController {
   async getAuditLogs(
     @Query() query: any,
     @Query() pagination: PaginationDto,
-    @Query('export') exportType?: string,
-    @Header('Accept') accept?: string,
     @Res() res: Response,
+    @Query('export') exportType?: string,
+    @Headers('accept') accept?: string,
   ) {
     const exportCsv = exportType === 'csv' || accept === 'text/csv';
     const result = await this.adminService.getAuditLogs(query, pagination, exportCsv);
@@ -173,5 +173,28 @@ export class AdminController {
     } else {
       res.json(result);
     }
+  }
+
+  // ── Generic Soft/Hard Delete and Restore ───────────────────────────────────
+
+  @Post(':entity/:id/restore')
+  @ApiOperation({ summary: 'Restore a soft-deleted record' })
+  restoreRecord(
+    @Param('entity') entity: string,
+    @Param('id') id: string,
+  ) {
+    return this.adminService.restoreRecord(entity, id);
+  }
+
+  @Delete(':entity/:id')
+  @ApiOperation({ summary: 'Soft or hard delete a record' })
+  deleteRecord(
+    @Param('entity') entity: string,
+    @Param('id') id: string,
+    @Query('hard') hard: string,
+    @Req() req: Request & { user: { id: string; role: MerchantRole } },
+  ) {
+    const isHard = hard === 'true';
+    return this.adminService.deleteRecord(entity, id, isHard, req.user.role);
   }
 }

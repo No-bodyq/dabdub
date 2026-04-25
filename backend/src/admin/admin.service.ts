@@ -37,12 +37,13 @@ export class AdminService {
       skip: (page - 1) * limit,
       take: limit,
       order: { createdAt: 'DESC' },
+      withDeleted: true,
     });
     return { merchants: merchants.map(m => this.sanitize(m)), total };
   }
 
   async findOneMerchant(id: string) {
-    const merchant = await this.merchantsRepo.findOne({ where: { id } });
+    const merchant = await this.merchantsRepo.findOne({ where: { id }, withDeleted: true });
     if (!merchant) throw new NotFoundException('Merchant not found');
     return this.sanitize(merchant);
   }
@@ -361,4 +362,55 @@ export class AdminService {
     const t = Math.floor(Date.now() / 1000);
     return [-1, 0, 1].some(w => this.totpCode(secret, t + w * 30) === token);
   }
+
+  // ── Generic Record Management (#soft-delete) ───────────────────────────────
+
+  async restoreRecord(entity: string, id: string) {
+    if (entity === 'merchants') {
+      const record = await this.merchantsRepo.findOne({ where: { id }, withDeleted: true });
+      if (!record) throw new NotFoundException('Merchant not found');
+      if (!record.deletedAt) throw new BadRequestException('Merchant is not deleted');
+      await this.merchantsRepo.restore(id);
+      return { success: true, id };
+    } else if (entity === 'payments') {
+      const record = await this.paymentsRepo.findOne({ where: { id }, withDeleted: true });
+      if (!record) throw new NotFoundException('Payment not found');
+      if (!record.deletedAt) throw new BadRequestException('Payment is not deleted');
+      await this.paymentsRepo.restore(id);
+      return { success: true, id };
+    } else {
+      throw new BadRequestException('Invalid entity type');
+    }
+  }
+
+  async deleteRecord(entity: string, id: string, hard: boolean, actorRole: MerchantRole) {
+    if (hard && actorRole !== MerchantRole.SUPERADMIN) {
+      throw new ForbiddenException('Only SUPERADMIN can hard delete records');
+    }
+
+    if (entity === 'merchants') {
+      const record = await this.merchantsRepo.findOne({ where: { id }, withDeleted: true });
+      if (!record) throw new NotFoundException('Merchant not found');
+      
+      if (hard) {
+        await this.merchantsRepo.delete(id);
+      } else {
+        await this.merchantsRepo.softDelete(id);
+      }
+      return { success: true, id, hardDeleted: hard };
+    } else if (entity === 'payments') {
+      const record = await this.paymentsRepo.findOne({ where: { id }, withDeleted: true });
+      if (!record) throw new NotFoundException('Payment not found');
+      
+      if (hard) {
+        await this.paymentsRepo.delete(id);
+      } else {
+        await this.paymentsRepo.softDelete(id);
+      }
+      return { success: true, id, hardDeleted: hard };
+    } else {
+      throw new BadRequestException('Invalid entity type');
+    }
+  }
 }
+

@@ -4,6 +4,7 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
+  DeleteDateColumn,
   OneToMany,
 } from 'typeorm';
 import { Exclude, Transform } from 'class-transformer';
@@ -113,4 +114,7 @@ export class Merchant {
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+  @DeleteDateColumn()
+  deletedAt: Date;
 }
