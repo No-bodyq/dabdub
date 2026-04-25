@@ -18,13 +18,16 @@ export class AuditService {
     detail: string,
     ipAddress?: string,
   ): Promise<AuditLog> {
-    const log = this.auditLogRepo.create({
+    const log = this.repo.create({
       adminId,
       action,
       detail,
       ipAddress: ipAddress ?? null,
-  /** INSERT only — this is an append-only log. */
-  async log(dto: CreateAuditLogDto): Promise<AuditLog> {
+    });
+    return this.repo.save(log);
+  }
+
+  async create(dto: CreateAuditLogDto): Promise<AuditLog> {
     const entry = this.repo.create({
       actorId: dto.actorId,
       actorType: dto.actorType,

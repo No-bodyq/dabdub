@@ -7,6 +7,7 @@ import { Repository } from 'typeorm';
 import { jwtConfig } from '../../config/jwt.config';
 import { User } from '../../users/entities/user.entity';
 import { Admin } from '../../admin/entities/admin.entity';
+import { CacheService } from '../../cache/cache.service';
 import type { JwtPayload } from '../auth.service';
 
 interface ExtendedJwtPayload extends JwtPayload {
@@ -24,6 +25,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     @InjectRepository(Admin)
     private readonly adminRepo: Repository<Admin>,
+    private readonly cacheService: CacheService,
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
@@ -33,12 +35,36 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: ExtendedJwtPayload): Promise<User | Admin> {
+    const sessionIdentifier = payload.jti ?? payload.sessionId;
+    if (!sessionIdentifier) {
+      throw new Error('Unauthorized');
+    }
+
+    const blacklistKey = `session:blacklist:${sessionIdentifier}`;
+    const isBlacklisted = await this.cacheService.get<boolean>(blacklistKey);
+    if (isBlacklisted) {
+      throw new Error('Unauthorized');
+    }
+
+    const cacheKey = `session:${sessionIdentifier}`;
+    const cached = await this.cacheService.get<User | Admin>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     if (payload.isAdmin) {
       const admin = await this.adminRepo.findOne({
         where: { id: payload.sub },
       });
       if (!admin) {
         throw new Error('Unauthorized');
+      }
+
+      const ttl = payload.exp
+        ? Math.max(Math.floor(payload.exp - Date.now() / 1000), 0)
+        : 0;
+      if (ttl > 0) {
+        await this.cacheService.set(cacheKey, admin, ttl);
       }
       return admin;
     }
@@ -47,6 +73,14 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     if (!user || !user.isActive) {
       throw new Error('Unauthorized');
     }
+
+    const ttl = payload.exp
+      ? Math.max(Math.floor(payload.exp - Date.now() / 1000), 0)
+      : 0;
+    if (ttl > 0) {
+      await this.cacheService.set(cacheKey, user, ttl);
+    }
+
     return user;
   }
 }

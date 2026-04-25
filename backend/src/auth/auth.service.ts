@@ -1,335 +1,270 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
+import { Injectable, Inject, ConflictException, UnauthorizedException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
-import { ConflictException, UnauthorizedException } from '@nestjs/common';
+import type { ConfigType } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
-import { AuthService } from './auth.service';
+import * as crypto from 'crypto';
+import { jwtConfig } from '../config/jwt.config';
 import { User } from '../users/entities/user.entity';
 import { Role } from '../rbac/rbac.types';
 import { RefreshToken } from './entities/refresh-token.entity';
 import { Session } from './entities/session.entity';
-import { jwtConfig } from '../config/jwt.config';
 import { CacheService } from '../cache/cache.service';
 import { GeoService } from '../geo/geo.service';
+import { LoginDto } from './dto/login.dto';
+import { RegisterDto } from './dto/register.dto';
+import { TokenResponseDto } from './dto/token-response.dto';
 
-// ── Mocks ────────────────────────────────────────────────────────────────────
+export interface JwtPayload {
+  sub: string;
+  username: string;
+  role: Role;
+  sessionId: string;
+  isAdmin?: boolean;
+  jti?: string;
+  exp?: number;
+}
 
-const mockUserRepo = {
-  findOne: jest.fn(),
-  create: jest.fn(),
-  save: jest.fn(),
-};
+@Injectable()
+export class AuthService {
+  constructor(
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
+    @InjectRepository(RefreshToken)
+    private readonly tokenRepo: Repository<RefreshToken>,
+    @InjectRepository(Session)
+    private readonly sessionRepo: Repository<Session>,
+    private readonly jwtService: JwtService,
+    @Inject(jwtConfig.KEY)
+    private readonly jwt: ConfigType<typeof jwtConfig>,
+    private readonly cacheService: CacheService,
+    private readonly geoService: GeoService,
+  ) {}
 
-const mockTokenRepo = {
-  findOne: jest.fn(),
-  create: jest.fn(),
-  save: jest.fn(),
-};
+  async register(
+    dto: RegisterDto,
+    ipAddress?: string,
+    deviceInfo?: Record<string, unknown>,
+  ): Promise<TokenResponseDto> {
+    const existingEmail = await this.userRepo.findOne({
+      where: { email: dto.email },
+    });
+    if (existingEmail) {
+      throw new ConflictException('Email already in use');
+    }
 
-const mockSessionRepo = {
-  findOne: jest.fn(),
-  create: jest.fn(),
-  save: jest.fn(),
-};
+    const existingUsername = await this.userRepo.findOne({
+      where: { username: dto.username },
+    });
+    if (existingUsername) {
+      throw new ConflictException('Username already in use');
+    }
 
-const mockJwtService = {
-  sign: jest.fn(),
-  verify: jest.fn(),
-  decode: jest.fn(),
-};
+    const passwordHash = await bcrypt.hash(dto.password, 12);
+    const user = this.userRepo.create({
+      email: dto.email,
+      username: dto.username,
+      passwordHash,
+      role: Role.User,
+      isAdmin: false,
+      isTreasury: false,
+      isMerchant: false,
+      isActive: true,
+    } as Partial<User>);
 
-const mockJwtConfig = {
-  accessSecret: 'access-secret-32-chars-minimum!!',
-  refreshSecret: 'refresh-secret-32-chars-minimum!!',
-  accessExpiry: '15m',
-  refreshExpiry: '30d',
-};
+    const savedUser = await this.userRepo.save(user);
+    return this.issueTokens(
+      savedUser,
+      crypto.randomUUID(),
+      ipAddress,
+      deviceInfo,
+    );
+  }
 
-const mockCacheService = {
-  trackActiveUser: jest.fn(),
-};
+  async login(
+    dto: LoginDto,
+    ipAddress?: string,
+    deviceInfo?: Record<string, unknown>,
+  ): Promise<TokenResponseDto> {
+    const user = await this.userRepo.findOne({
+      where: { email: dto.email },
+    });
+    if (!user) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
 
-const mockGeoService = {
-  getCountry: jest.fn().mockReturnValue('NG'),
-};
+    const passwordMatches = await bcrypt.compare(dto.password, user.passwordHash);
+    if (!passwordMatches || !user.isActive) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+    return this.issueTokens(
+      user,
+      crypto.randomUUID(),
+      ipAddress,
+      deviceInfo,
+    );
+  }
 
-const makeUser = (overrides: Partial<User> = {}): User =>
-  ({
-    id: 'user-uuid-1',
-    email: 'alice@example.com',
-    username: 'alice',
-    passwordHash: '$2b$12$hashedpassword',
-    isAdmin: false,
-    role: Role.User,
-    isMerchant: false,
-    isActive: true,
-    isTreasury: false,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    ...overrides,
-  }) as User;
+  async refresh(refreshToken: string): Promise<TokenResponseDto> {
+    let payload: JwtPayload;
 
-const makeRefreshToken = (
-  overrides: Partial<RefreshToken> = {},
-): RefreshToken =>
-  ({
-    id: 'rt-uuid-1',
-    userId: 'user-uuid-1',
-    tokenHash: 'a'.repeat(64),
-    sessionId: 'session-uuid-1',
-    deviceInfo: null,
-    ipAddress: null,
-    expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-    revokedAt: null,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    ...overrides,
-  }) as RefreshToken;
+    try {
+      payload = this.jwtService.verify(refreshToken, {
+        secret: this.jwt.refreshSecret,
+      }) as JwtPayload;
+    } catch {
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
 
-// ── Suite ─────────────────────────────────────────────────────────────────────
+    if (!payload?.sessionId || !payload?.sub) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
 
-describe('AuthService', () => {
-  let service: AuthService;
-
-  beforeEach(async () => {
-    jest.clearAllMocks();
-
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        AuthService,
-        { provide: getRepositoryToken(User), useValue: mockUserRepo },
-        { provide: getRepositoryToken(RefreshToken), useValue: mockTokenRepo },
-        { provide: getRepositoryToken(Session), useValue: mockSessionRepo },
-        { provide: JwtService, useValue: mockJwtService },
-        { provide: jwtConfig.KEY, useValue: mockJwtConfig },
-        { provide: CacheService, useValue: mockCacheService },
-        { provide: GeoService, useValue: mockGeoService },
-      ],
-    }).compile();
-
-    service = module.get<AuthService>(AuthService);
-  });
-
-  // ── register ───────────────────────────────────────────────────────────────
-
-  describe('register', () => {
-    it('creates a user and returns a token pair', async () => {
-      mockUserRepo.findOne.mockResolvedValue(null); // no existing email/username
-      const user = makeUser();
-      mockUserRepo.create.mockReturnValue(user);
-      mockUserRepo.save.mockResolvedValue(user);
-
-      const savedToken = makeRefreshToken();
-      mockTokenRepo.create.mockReturnValue(savedToken);
-      mockTokenRepo.save.mockResolvedValue(savedToken);
-      mockSessionRepo.create.mockReturnValue({});
-      mockSessionRepo.save.mockResolvedValue({});
-
-      mockJwtService.sign
-        .mockReturnValueOnce('access-token')
-        .mockReturnValueOnce('refresh-token');
-
-      const result = await service.register({
-        email: 'alice@example.com',
-        username: 'alice',
-        password: 'password123',
-      });
-
-      expect(result.accessToken).toBe('access-token');
-      expect(result.refreshToken).toBe('refresh-token');
-      expect(result.expiresIn).toBe(900); // 15m in seconds
+    const tokenHash = this.hashToken(refreshToken);
+    const storedToken = await this.tokenRepo.findOne({
+      where: { sessionId: payload.sessionId, tokenHash },
     });
 
-    it('throws ConflictException when email already exists', async () => {
-      mockUserRepo.findOne
-        .mockResolvedValueOnce(makeUser()) // email exists
-        .mockResolvedValueOnce(null);
+    if (!storedToken || storedToken.revokedAt) {
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
 
-      await expect(
-        service.register({
-          email: 'alice@example.com',
-          username: 'alice',
-          password: 'pass1234',
-        }),
-      ).rejects.toThrow(ConflictException);
+    storedToken.revokedAt = new Date();
+    await this.tokenRepo.save(storedToken);
+
+    const user = await this.userRepo.findOne({
+      where: { id: payload.sub },
     });
 
-    it('throws ConflictException when username already exists', async () => {
-      mockUserRepo.findOne
-        .mockResolvedValueOnce(null) // email ok
-        .mockResolvedValueOnce(makeUser()); // username taken
+    if (!user || !user.isActive) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
 
-      await expect(
-        service.register({
-          email: 'new@example.com',
-          username: 'alice',
-          password: 'pass1234',
-        }),
-      ).rejects.toThrow(ConflictException);
-    });
-  });
+    return this.issueTokens(user, payload.sessionId);
+  }
 
-  // ── login ──────────────────────────────────────────────────────────────────
-
-  describe('login', () => {
-    it('returns a token pair for valid credentials', async () => {
-      const hash = await bcrypt.hash('password123', 4); // low cost for tests
-      const user = makeUser({ passwordHash: hash });
-      mockUserRepo.findOne.mockResolvedValue(user);
-
-      const savedToken = makeRefreshToken();
-      mockTokenRepo.create.mockReturnValue(savedToken);
-      mockTokenRepo.save.mockResolvedValue(savedToken);
-      mockSessionRepo.create.mockReturnValue({});
-      mockSessionRepo.save.mockResolvedValue({});
-
-      mockJwtService.sign
-        .mockReturnValueOnce('access-token')
-        .mockReturnValueOnce('refresh-token');
-
-      const result = await service.login({
-        email: 'alice@example.com',
-        password: 'password123',
-      });
-      expect(result.accessToken).toBe('access-token');
+  async logout(sessionId: string): Promise<void> {
+    const storedToken = await this.tokenRepo.findOne({
+      where: { sessionId },
     });
 
-    it('throws UnauthorizedException for wrong password', async () => {
-      const hash = await bcrypt.hash('realpassword', 4);
-      mockUserRepo.findOne.mockResolvedValue(makeUser({ passwordHash: hash }));
+    if (!storedToken) {
+      return;
+    }
 
-      await expect(
-        service.login({
-          email: 'alice@example.com',
-          password: 'wrongpassword',
-        }),
-      ).rejects.toThrow(UnauthorizedException);
+    storedToken.revokedAt = new Date();
+    await this.tokenRepo.save(storedToken);
+
+    await this.cacheService.del(`session:${sessionId}`);
+    const blacklistTtl = this.parseExpiry(this.jwt.accessExpiry);
+    await this.cacheService.set(
+      `session:blacklist:${sessionId}`,
+      true,
+      blacklistTtl,
+    );
+  }
+
+  async issueTokens(
+    user: User,
+    sessionId: string,
+    ipAddress?: string,
+    deviceInfo?: Record<string, unknown>,
+    isAdmin = false,
+  ): Promise<TokenResponseDto> {
+    const payload: JwtPayload = {
+      sub: user.id,
+      username: user.username,
+      role: user.role,
+      sessionId,
+      isAdmin,
+      jti: sessionId,
+    };
+
+    const accessToken = this.jwtService.sign(payload, {
+      secret: this.jwt.accessSecret,
+      expiresIn: this.jwt.accessExpiry as any,
     });
 
-    it('throws UnauthorizedException when user not found', async () => {
-      mockUserRepo.findOne.mockResolvedValue(null);
-
-      await expect(
-        service.login({ email: 'ghost@example.com', password: 'pass' }),
-      ).rejects.toThrow(UnauthorizedException);
+    const refreshToken = this.jwtService.sign(payload, {
+      secret: this.jwt.refreshSecret,
+      expiresIn: this.jwt.refreshExpiry as any,
     });
 
-    it('throws UnauthorizedException for inactive account', async () => {
-      const hash = await bcrypt.hash('password123', 4);
-      mockUserRepo.findOne.mockResolvedValue(
-        makeUser({ passwordHash: hash, isActive: false }),
-      );
+    const expiresAt = new Date(
+      Date.now() + this.parseExpiry(this.jwt.refreshExpiry) * 1000,
+    );
 
-      await expect(
-        service.login({ email: 'alice@example.com', password: 'password123' }),
-      ).rejects.toThrow(UnauthorizedException);
-    });
-  });
+    const refreshTokenEntity = this.tokenRepo.create({
+      userId: user.id,
+      sessionId,
+      tokenHash: this.hashToken(refreshToken),
+      deviceInfo: deviceInfo ?? null,
+      ipAddress: ipAddress ?? null,
+      expiresAt,
+      revokedAt: null,
+    } as Partial<RefreshToken>);
 
-  // ── refresh ────────────────────────────────────────────────────────────────
+    const savedRefreshToken = await this.tokenRepo.save(refreshTokenEntity);
 
-  describe('refresh', () => {
-    it('rotates the refresh token and returns a new pair', async () => {
-      const payload = {
-        sub: 'user-uuid-1',
-        username: 'alice',
-        role: 'user',
-        sessionId: 'session-1',
-      };
-      mockJwtService.verify.mockReturnValue(payload);
-
-      const stored = makeRefreshToken({ sessionId: 'session-1' });
-      mockTokenRepo.findOne.mockResolvedValue(stored);
-      mockTokenRepo.save.mockResolvedValue({
-        ...stored,
-        revokedAt: new Date(),
-      });
-
-      const user = makeUser();
-      mockUserRepo.findOne.mockResolvedValue(user);
-
-      const newToken = makeRefreshToken({ id: 'rt-uuid-2' });
-      mockTokenRepo.create.mockReturnValue(newToken);
-      mockTokenRepo.save.mockResolvedValue(newToken);
-      mockSessionRepo.create.mockReturnValue({});
-      mockSessionRepo.save.mockResolvedValue({});
-
-      mockJwtService.sign
-        .mockReturnValueOnce('new-access-token')
-        .mockReturnValueOnce('new-refresh-token');
-
-      const result = await service.refresh('old-refresh-token');
-      expect(result.accessToken).toBe('new-access-token');
-      // Old token should have been revoked
-      expect(mockTokenRepo.save).toHaveBeenCalledWith(
-        expect.objectContaining({ revokedAt: expect.any(Date) }),
-      );
+    const existingSession = await this.sessionRepo.findOne({
+      where: { id: sessionId },
     });
 
-    it('throws 401 when refresh token is revoked', async () => {
-      const payload = {
-        sub: 'u1',
-        username: 'alice',
-        role: 'user',
-        sessionId: 's1',
-      };
-      mockJwtService.verify.mockReturnValue(payload);
+    if (existingSession) {
+      existingSession.refreshTokenId = savedRefreshToken.id;
+      existingSession.deviceInfo = deviceInfo ?? null;
+      existingSession.ipAddress = ipAddress ?? null;
+      existingSession.country = ipAddress ? this.geoService.getCountry(ipAddress) : null;
+      existingSession.lastSeenAt = new Date();
+      await this.sessionRepo.save(existingSession);
+    } else {
+      const session = this.sessionRepo.create({
+        id: sessionId,
+        userId: user.id,
+        refreshTokenId: savedRefreshToken.id,
+        deviceInfo: deviceInfo ?? null,
+        ipAddress: ipAddress ?? null,
+        country: ipAddress ? this.geoService.getCountry(ipAddress) : null,
+        lastSeenAt: new Date(),
+      } as Partial<Session>);
+      await this.sessionRepo.save(session);
+    }
 
-      const revokedToken = makeRefreshToken({ revokedAt: new Date() });
-      mockTokenRepo.findOne.mockResolvedValue(revokedToken);
+    await this.cacheService.trackActiveUser(user.id);
 
-      await expect(service.refresh('revoked-token')).rejects.toThrow(
-        UnauthorizedException,
-      );
-    });
+    return {
+      accessToken,
+      refreshToken,
+      expiresIn: this.parseExpiry(this.jwt.accessExpiry),
+    };
+  }
 
-    it('throws 401 when reusing a revoked refresh token (rotation guard)', async () => {
-      mockJwtService.verify.mockReturnValue({
-        sub: 'u1',
-        username: 'alice',
-        role: 'user',
-        sessionId: 's1',
-      });
-      // Token not found in DB (was previously rotated away)
-      mockTokenRepo.findOne.mockResolvedValue(null);
+  private hashToken(token: string): string {
+    return crypto.createHash('sha256').update(token).digest('hex');
+  }
 
-      await expect(service.refresh('old-revoked-token')).rejects.toThrow(
-        UnauthorizedException,
-      );
-    });
+  private parseExpiry(value: string): number {
+    const match = /^([0-9]+)([smhdw])$/.exec(value);
+    if (!match) {
+      return Number(value) || 0;
+    }
 
-    it('throws 401 when verify fails (tampered / expired token)', async () => {
-      mockJwtService.verify.mockImplementation(() => {
-        throw new Error('jwt expired');
-      });
-
-      await expect(service.refresh('bad-token')).rejects.toThrow(
-        UnauthorizedException,
-      );
-    });
-  });
-
-  // ── logout ─────────────────────────────────────────────────────────────────
-
-  describe('logout', () => {
-    it('revokes the refresh token for the given sessionId', async () => {
-      const token = makeRefreshToken();
-      mockTokenRepo.findOne.mockResolvedValue(token);
-      mockTokenRepo.save.mockResolvedValue({ ...token, revokedAt: new Date() });
-
-      await service.logout('session-uuid-1');
-
-      expect(mockTokenRepo.save).toHaveBeenCalledWith(
-        expect.objectContaining({ revokedAt: expect.any(Date) }),
-      );
-    });
-
-    it('is a no-op when token not found', async () => {
-      mockTokenRepo.findOne.mockResolvedValue(null);
-      await service.logout('nonexistent-session');
-      expect(mockTokenRepo.save).not.toHaveBeenCalled();
-    });
-  });
-});
+    const amount = Number(match[1]);
+    switch (match[2]) {
+      case 's':
+        return amount;
+      case 'm':
+        return amount * 60;
+      case 'h':
+        return amount * 3600;
+      case 'd':
+        return amount * 86400;
+      case 'w':
+        return amount * 604800;
+      default:
+        return amount;
+    }
+  }
+}

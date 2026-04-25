@@ -46,7 +46,10 @@ const mockJwtConfig = {
 };
 
 const mockCacheService = {
-  trackActiveUser: jest.fn(),
+  get: jest.fn(),
+  set: jest.fn().mockResolvedValue(true),
+  del: jest.fn().mockResolvedValue(undefined),
+  trackActiveUser: jest.fn().mockResolvedValue(undefined),
 };
 
 const mockGeoService = {
@@ -94,7 +97,7 @@ describe('AuthService', () => {
   let service: AuthService;
 
   beforeEach(async () => {
-    jest.clearAllMocks();
+    jest.resetAllMocks();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -110,6 +113,9 @@ describe('AuthService', () => {
     }).compile();
 
     service = module.get<AuthService>(AuthService);
+
+    mockSessionRepo.findOne.mockResolvedValue(null);
+    mockCacheService.get.mockResolvedValue(null);
   });
 
   // ── register ───────────────────────────────────────────────────────────────
@@ -323,6 +329,21 @@ describe('AuthService', () => {
 
       expect(mockTokenRepo.save).toHaveBeenCalledWith(
         expect.objectContaining({ revokedAt: expect.any(Date) }),
+      );
+    });
+
+    it('revokes the refresh token and invalidates session cache', async () => {
+      const token = makeRefreshToken();
+      mockTokenRepo.findOne.mockResolvedValue(token);
+      mockTokenRepo.save.mockResolvedValue({ ...token, revokedAt: new Date() });
+
+      await service.logout('session-uuid-1');
+
+      expect(mockCacheService.del).toHaveBeenCalledWith('session:session-uuid-1');
+      expect(mockCacheService.set).toHaveBeenCalledWith(
+        'session:blacklist:session-uuid-1',
+        true,
+        900,
       );
     });
 

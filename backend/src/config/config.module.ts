@@ -101,10 +101,6 @@ const validationSchema = Joi.object({
   STELLAR_CONTRACT_ID: Joi.string()
     .required()
     .messages({ 'any.required': 'STELLAR_CONTRACT_ID is required' }),
-  STELLAR_ADMIN_SECRET_KEY: Joi.string().min(32).required().messages({
-    'any.required': 'STELLAR_ADMIN_SECRET_KEY is required',
-    'string.min': 'STELLAR_ADMIN_SECRET_KEY must be at least 32 characters',
-  }),
   STELLAR_ADMIN_SECRET_KEY: Joi.string()
     .min(32)
     .required()
