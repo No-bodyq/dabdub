@@ -1,43 +1,19 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { ConfigModule } from '@nestjs/config';
-import { Admin } from './entities/admin.entity';
 import { AdminService } from './admin.service';
 import { AdminController } from './admin.controller';
-import { User } from '../users/entities/user.entity';
-import { Transaction } from '../transactions/entities/transaction.entity';
-import { FraudFlag } from '../fraud/entities/fraud-flag.entity';
-import { Session } from '../auth/entities/session.entity';
-import { RefreshToken } from '../auth/entities/refresh-token.entity';
-import { EmailModule } from '../email/email.module';
-import { NotificationsModule } from '../notifications/notifications.module';
-import { AdminAuthModule } from './auth/admin-auth.module';
-import { AnalyticsModule } from './analytics/analytics.module';
-import { CronModule } from '../cron/cron.module';
 import { CronAdminController } from './cron-admin.controller';
-import { AuditModule } from '../audit/audit.module';
-import { stellarConfig } from '../config/stellar.config';
+import { Merchant } from '../merchants/entities/merchant.entity';
+import { Payment } from '../payments/entities/payment.entity';
+import { FeeConfig } from '../fee-config/entities/fee-config.entity';
+import { FeeHistory } from '../fee-config/entities/fee-history.entity';
+import { CronModule } from '../cron/cron.module';
+import { AuditLog } from './entities/audit-log.entity';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([
-      Admin,
-      User,
-      Transaction,
-      FraudFlag,
-      Session,
-      RefreshToken,
-    ]),
-    ConfigModule.forFeature(stellarConfig),
-    EmailModule,
-    NotificationsModule,
-    AdminAuthModule,
-    AuditModule,
-    AnalyticsModule,
-    CronModule,
-  ],
-  providers: [AdminService],
+  imports: [TypeOrmModule.forFeature([Merchant, Payment, FeeConfig, FeeHistory, AuditLog]), CronModule],
   controllers: [AdminController, CronAdminController],
-  exports: [AdminService, AdminAuthModule, AnalyticsModule],
+  providers: [AdminService],
+  exports: [AdminService],
 })
 export class AdminModule {}

@@ -1,171 +1,106 @@
-import {
-  ConflictException,
-  ForbiddenException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, EntityManager, Repository } from 'typeorm';
-import { NotificationType } from '../notifications/notifications.types';
-import { NotificationService } from '../notifications/notifications.service';
-import { User } from '../users/entities/user.entity';
-import { Role } from '../rbac/rbac.types';
-import { RegisterMerchantDto } from './dto/register-merchant.dto';
-import { UpdateMerchantDto } from './dto/update-merchant.dto';
-import { Merchant } from './entities/merchant.entity';
+import { Repository } from 'typeorm';
+import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
+import { Merchant, MerchantStatus } from './entities/merchant.entity';
+import { AdminAuditLog } from './entities/admin-audit-log.entity';
+import { UpdateMerchantDto } from './dto/create-merchant.dto';
+import { BulkMerchantActionDto, BulkActionResponseDto, BulkActionResultDto } from './dto/bulk-merchant-action.dto';
 
 @Injectable()
 export class MerchantsService {
   constructor(
-    private readonly dataSource: DataSource,
-
     @InjectRepository(Merchant)
-    private readonly merchantRepo: Repository<Merchant>,
-
-    private readonly notificationService: NotificationService,
+    private merchantsRepo: Repository<Merchant>,
+    @InjectRepository(AdminAuditLog)
+    private auditRepo: Repository<AdminAuditLog>,
   ) {}
 
-  async register(user: User, dto: RegisterMerchantDto): Promise<Merchant> {
-    const existing = await this.merchantRepo.findOne({
-      where: { userId: user.id },
-    });
-    if (existing) {
-      throw new ConflictException('Merchant profile already exists');
-    }
+  async findOne(id: string): Promise<Merchant> {
+    const merchant = await this.merchantsRepo.findOne({ where: { id } });
+    if (!merchant) throw new NotFoundException('Merchant not found');
+    return merchant;
+  }
 
-    const merchant = await this.dataSource.transaction(
-      async (trx: EntityManager) => {
-        const merchantEntity = trx.getRepository(Merchant).create({
-          userId: user.id,
-          businessName: dto.businessName,
-          businessType: dto.businessType,
-          logoKey: dto.logoKey ?? null,
-          description: dto.description ?? null,
-          settlementCurrency: dto.settlementCurrency,
-          autoSettleEnabled: dto.autoSettleEnabled ?? true,
-          settlementThresholdUsdc: dto.threshold ?? 10,
+  async update(id: string, dto: UpdateMerchantDto): Promise<Merchant> {
+    const merchant = await this.findOne(id);
+    Object.assign(merchant, dto);
+    return this.merchantsRepo.save(merchant);
+  }
+
+  async bulkUpdateStatus(
+    adminId: string,
+    dto: BulkMerchantActionDto,
+    status: MerchantStatus,
+  ): Promise<BulkActionResponseDto> {
+    const results: BulkActionResultDto[] = [];
+    let successful = 0;
+    let failed = 0;
+
+    for (const id of dto.ids) {
+      try {
+        const merchant = await this.merchantsRepo.findOne({ where: { id } });
+        if (!merchant) {
+          throw new Error('Merchant not found');
+        }
+
+        const oldStatus = merchant.status;
+        merchant.status = status;
+        await this.merchantsRepo.save(merchant);
+
+        await this.auditRepo.save({
+          adminId,
+          action: `merchant_${status}`,
+          targetId: id,
+          details: {
+            oldStatus,
+            newStatus: status,
+          },
         });
 
-        const savedMerchant = await trx
-          .getRepository(Merchant)
-          .save(merchantEntity);
+        results.push({ id, success: true });
+        successful++;
+      } catch (error) {
+        results.push({ id, success: false, error: error.message });
+        failed++;
+      }
+    }
 
-        user.isMerchant = true;
-        user.role = UserRole.MERCHANT;
-        await trx.getRepository(User).save(user);
-
-        return savedMerchant;
-      },
-    );
-    const merchant = await this.dataSource.transaction(async (trx: EntityManager) => {
-      const merchantEntity = trx.getRepository(Merchant).create({
-        userId: user.id,
-        businessName: dto.businessName,
-        businessType: dto.businessType,
-        logoKey: dto.logoKey ?? null,
-        description: dto.description ?? null,
-        settlementCurrency: dto.settlementCurrency,
-        autoSettleEnabled: dto.autoSettleEnabled ?? true,
-        settlementThresholdUsdc: dto.threshold ?? 10,
-      });
-
-      const savedMerchant = await trx.getRepository(Merchant).save(merchantEntity);
-
-      user.isMerchant = true;
-      user.role = Role.Merchant;
-      await trx.getRepository(User).save(user);
-
-      return savedMerchant;
-    });
-
-    return merchant;
+    return {
+      results,
+      total: dto.ids.length,
+      successful,
+      failed,
+    };
   }
 
-  async getMe(user: User): Promise<Merchant> {
-    if (!user.isMerchant) {
-      throw new ForbiddenException('Merchant account required');
-    }
+  async generateApiKey(id: string): Promise<{ apiKey: string }> {
+    const merchant = await this.findOne(id);
+    const rawKey = `cpk_${crypto.randomBytes(32).toString('hex')}`;
+    const hash = await bcrypt.hash(rawKey, 10);
 
-    const merchant = await this.merchantRepo.findOne({
-      where: { userId: user.id },
-    });
-    if (!merchant) {
-      throw new NotFoundException('Merchant profile not found');
-    }
+    merchant.apiKey = rawKey.substring(0, 12) + '...';
+    merchant.apiKeyHash = hash;
+    await this.merchantsRepo.save(merchant);
 
-    return merchant;
+    return { apiKey: rawKey };
   }
 
-  async updateMe(user: User, dto: UpdateMerchantDto): Promise<Merchant> {
-    const merchant = await this.getMe(user);
-
-    if (dto.businessName !== undefined)
-      merchant.businessName = dto.businessName;
-    if (dto.businessType !== undefined)
-      merchant.businessType = dto.businessType;
-    if (dto.description !== undefined) merchant.description = dto.description;
-    if (dto.logoKey !== undefined) merchant.logoKey = dto.logoKey;
-    if (dto.settlementCurrency !== undefined) {
-      merchant.settlementCurrency = dto.settlementCurrency;
-    }
-    if (dto.autoSettleEnabled !== undefined) {
-      merchant.autoSettleEnabled = dto.autoSettleEnabled;
-    }
-    if (dto.threshold !== undefined) {
-      merchant.settlementThresholdUsdc = dto.threshold;
-    }
-
-    return this.merchantRepo.save(merchant);
+  async getProfile(id: string) {
+    return this.findOne(id);
   }
 
-  async getPublicByUsername(username: string): Promise<{
-    businessName: string;
-    logoKey: string | null;
-    isVerified: boolean;
-  }> {
-    const merchant = await this.merchantRepo
-      .createQueryBuilder('merchant')
-      .innerJoin(User, 'user', 'user.id = merchant.user_id')
-      .where('user.username = :username', { username })
-      .select([
-        'merchant.businessName AS "businessName"',
-        'merchant.logoKey AS "logoKey"',
-        'merchant.isVerified AS "isVerified"',
-      ])
-      .getRawOne<{
-        businessName: string;
-        logoKey: string | null;
-        isVerified: boolean;
-      }>();
-
+  async updateMerchantFee(
+    merchantId: string,
+    customFeeRate: number | null,
+  ): Promise<Merchant> {
+    const merchant = await this.merchantsRepo.findOne({ where: { id: merchantId } });
     if (!merchant) {
       throw new NotFoundException('Merchant not found');
     }
 
-    return merchant;
-  }
-
-  async verifyMerchant(merchantId: string): Promise<Merchant> {
-    const merchant = await this.merchantRepo.findOne({
-      where: { id: merchantId },
-    });
-    if (!merchant) {
-      throw new NotFoundException('Merchant not found');
-    }
-
-    if (!merchant.isVerified) {
-      merchant.isVerified = true;
-      await this.merchantRepo.save(merchant);
-
-      await this.notificationService.create(
-        merchant.userId,
-        NotificationType.SYSTEM,
-        'Merchant account verified',
-        'Your merchant profile is now verified and shows a verified badge.',
-        { merchantId: merchant.id },
-      );
-    }
-
-    return merchant;
+    merchant.customFeeRate = customFeeRate != null ? String(customFeeRate) : null;
+    return this.merchantsRepo.save(merchant);
   }
 }
