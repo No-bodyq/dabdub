@@ -22,6 +22,8 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { AdminRole } from './entities/admin.entity';
 import { Request } from 'express';
 import { AuditInterceptor, Audit } from '../audit/audit.interceptor';
+import { QueryAdminPaymentsDto } from './dto/query-admin-payments.dto';
+import { AdminPaymentDto, PaginatedAdminPaymentsDto } from './dto/admin-payment-response.dto';
 
 @ApiTags('admin')
 @ApiBearerAuth()
@@ -75,6 +77,22 @@ export class AdminController {
   @ApiOperation({ summary: 'List all transactions globally' })
   async listTransactions(@Query() query: any) {
     return this.adminService.findAllTransactions(query);
+  }
+
+  @Get('payments')
+  @Roles(AdminRole.ADMIN, AdminRole.SUPERADMIN)
+  @ApiOperation({ summary: 'List all payments across all merchants (paginated, filterable)' })
+  @ApiResponse({ status: 200, type: PaginatedAdminPaymentsDto })
+  async listPayments(@Query() query: QueryAdminPaymentsDto): Promise<PaginatedAdminPaymentsDto> {
+    return this.adminService.findAllPayments(query);
+  }
+
+  @Get('payments/:id')
+  @Roles(AdminRole.ADMIN, AdminRole.SUPERADMIN)
+  @ApiOperation({ summary: 'Get full payment detail including Stellar.expert link' })
+  @ApiResponse({ status: 200, type: AdminPaymentDto })
+  async getPayment(@Param('id') id: string): Promise<AdminPaymentDto> {
+    return this.adminService.findPaymentById(id);
   }
 
   @Post('broadcast')

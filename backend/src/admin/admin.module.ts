@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ConfigModule } from '@nestjs/config';
 import { Admin } from './entities/admin.entity';
 import { AdminService } from './admin.service';
 import { AdminController } from './admin.controller';
@@ -15,8 +16,7 @@ import { AnalyticsModule } from './analytics/analytics.module';
 import { CronModule } from '../cron/cron.module';
 import { CronAdminController } from './cron-admin.controller';
 import { AuditModule } from '../audit/audit.module';
-
-import { AnalyticsModule } from './analytics/analytics.module';
+import { stellarConfig } from '../config/stellar.config';
 
 @Module({
   imports: [
@@ -28,6 +28,7 @@ import { AnalyticsModule } from './analytics/analytics.module';
       Session,
       RefreshToken,
     ]),
+    ConfigModule.forFeature(stellarConfig),
     EmailModule,
     NotificationsModule,
     AdminAuthModule,
@@ -37,9 +38,6 @@ import { AnalyticsModule } from './analytics/analytics.module';
   ],
   providers: [AdminService],
   controllers: [AdminController, CronAdminController],
-  ],
-  providers: [AdminService],
-  controllers: [AdminController],
   exports: [AdminService, AdminAuthModule, AnalyticsModule],
 })
 export class AdminModule {}

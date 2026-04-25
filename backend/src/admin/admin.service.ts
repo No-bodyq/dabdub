@@ -5,6 +5,7 @@ import { User, KycStatus } from '../users/entities/user.entity';
 import {
   Transaction,
   TransactionStatus,
+  TransactionType,
 } from '../transactions/entities/transaction.entity';
 import {
   FraudFlag,
@@ -15,9 +16,15 @@ import { Session } from '../auth/entities/session.entity';
 import { RefreshToken } from '../auth/entities/refresh-token.entity';
 import { EmailService } from '../email/email.service';
 import { AuditService } from '../audit/audit.service';
-import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationService } from '../notifications/notifications.service';
 import { CacheService } from '../cache/cache.service';
 import { TierName } from '../tier-config/entities/tier-config.entity';
+import { stellarConfig, StellarConfig } from '../config/stellar.config';
+import { QueryAdminPaymentsDto } from './dto/query-admin-payments.dto';
+import {
+  AdminPaymentDto,
+  PaginatedAdminPaymentsDto,
+} from './dto/admin-payment-response.dto';
 
 @Injectable()
 export class AdminService {
@@ -34,8 +41,10 @@ export class AdminService {
     private readonly tokenRepo: Repository<RefreshToken>,
     private readonly emailService: EmailService,
     private readonly auditService: AuditService,
-    private readonly notificationsService: NotificationsService,
+    private readonly notificationsService: NotificationService,
     private readonly cacheService: CacheService,
+    @Inject(stellarConfig.KEY)
+    private readonly stellarCfg: StellarConfig,
   ) {}
 
   async findAllUsers(query: {
@@ -238,6 +247,48 @@ export class AdminService {
     });
 
     return { data, total, page, limit };
+  }
+
+  async findAllPayments(query: QueryAdminPaymentsDto): Promise<PaginatedAdminPaymentsDto> {
+    const { page = 1, limit = 20, merchantId, status, network, dateFrom, dateTo, minAmount } = query;
+    const skip = (page - 1) * limit;
+
+    const qb = this.txRepo.createQueryBuilder('tx').orderBy('tx.createdAt', 'DESC').skip(skip).take(limit);
+
+    if (merchantId) {
+      qb.andWhere('tx.user_id = :merchantId', { merchantId });
+    }
+    if (status) {
+      qb.andWhere('tx.status = :status', { status });
+    }
+    if (network) {
+      qb.andWhere('tx.type = :type', { type: network });
+    }
+    if (dateFrom) {
+      qb.andWhere('tx.createdAt >= :dateFrom', { dateFrom: new Date(dateFrom) });
+    }
+    if (dateTo) {
+      qb.andWhere('tx.createdAt <= :dateTo', { dateTo: new Date(dateTo) });
+    }
+    if (minAmount) {
+      qb.andWhere('tx.amount_usdc::numeric >= :minAmount', { minAmount: parseFloat(minAmount) });
+    }
+
+    const [rows, total] = await qb.getManyAndCount();
+    const network_ = this.stellarCfg.network;
+
+    return {
+      data: rows.map((tx: Transaction) => AdminPaymentDto.fromEntity(tx, network_)),
+      total,
+      page,
+      limit,
+    };
+  }
+
+  async findPaymentById(id: string): Promise<AdminPaymentDto> {
+    const tx = await this.txRepo.findOne({ where: { id } });
+    if (!tx) throw new NotFoundException('Payment not found');
+    return AdminPaymentDto.fromEntity(tx, this.stellarCfg.network);
   }
 
   async broadcast(dto: { title: string; body: string; segment: string }) {
