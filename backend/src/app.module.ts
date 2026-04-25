@@ -31,6 +31,9 @@ import { PrometheusModule } from './prometheus/prometheus.module';
 import { AuditModule } from './audit/audit.module';
 import { HttpMetricsInterceptor } from './prometheus/http-metrics.interceptor';
 
+import { MiddlewareConsumer, NestModule } from '@nestjs/common';
+import { CorrelationIdMiddleware } from './common/middleware/correlation-id.middleware';
+
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
@@ -120,4 +123,8 @@ import { HttpMetricsInterceptor } from './prometheus/http-metrics.interceptor';
     },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(CorrelationIdMiddleware).forRoutes('*');
+  }
+}

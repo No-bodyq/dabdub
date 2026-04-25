@@ -1,4 +1,6 @@
 import { NestFactory, Reflector, HttpAdapterHost } from '@nestjs/core';
+import { WinstonModule } from 'nest-winston';
+import * as winston from 'winston';
 import helmet from 'helmet';
 import { ClassSerializerInterceptor, ValidationPipe, RequestMethod } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -13,7 +15,25 @@ const { version } = require('../package.json') as { version: string };
 
 async function bootstrap(): Promise<void> {
   startTelemetry(readTelemetryConfig());
-  const app = await NestFactory.create(AppModule, { rawBody: true });
+
+  const app = await NestFactory.create(AppModule, { rawBody: true, logger: WinstonModule.createLogger({
+    level: 'silly',
+    transports: [
+      new winston.transports.Console({
+        format: winston.format.combine(
+          winston.format.timestamp(),
+          winston.format.json(),
+        ),
+      }),
+      new winston.transports.File({
+        filename: 'logs/app.log',
+        format: winston.format.combine(
+          winston.format.timestamp(),
+          winston.format.json(),
+        ),
+      }),
+    ],
+  }) });
 
   // Security headers — helmet must be applied before routes are registered
   app.use(

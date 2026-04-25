@@ -25,6 +25,7 @@ export class LoggingInterceptor implements NestInterceptor {
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const req = context.switchToHttp().getRequest();
     const { method, url, user } = req;
+    const correlationId = req.correlationId || req.headers['x-correlation-id'];
     const merchantId: string | undefined = user?.merchantId;
     const start = Date.now();
 
@@ -36,7 +37,7 @@ export class LoggingInterceptor implements NestInterceptor {
           const duration = Date.now() - start;
           const level = statusCode >= 500 ? 'error' : statusCode >= 400 ? 'warn' : 'log';
           this.logger[level](
-            JSON.stringify(sanitize({ method, url, statusCode, duration, merchantId })),
+            JSON.stringify(sanitize({ method, url, statusCode, duration, merchantId, correlationId })),
           );
         },
         error: (err: { status?: number; message?: string }) => {
@@ -44,7 +45,7 @@ export class LoggingInterceptor implements NestInterceptor {
           const duration = Date.now() - start;
           const level = statusCode >= 500 ? 'error' : 'warn';
           this.logger[level](
-            JSON.stringify({ method, url, statusCode, duration, merchantId, error: err.message }),
+            JSON.stringify({ method, url, statusCode, duration, merchantId, correlationId, error: err.message }),
           );
         },
       }),
