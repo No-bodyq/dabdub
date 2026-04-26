@@ -6,6 +6,8 @@ import { Payment, PaymentStatus } from '../payments/entities/payment.entity';
 import { StellarService } from './stellar.service';
 import { SettlementsService } from '../settlements/settlements.service';
 import { WebhooksService } from '../webhooks/webhooks.service';
+import { RetryConfigService } from '../retry/retry-config.service';
+import { RetryQueueService } from '../retry/retry-queue.service';
 
 @Injectable()
 export class StellarMonitorService {
@@ -18,6 +20,8 @@ export class StellarMonitorService {
     private stellar: StellarService,
     private settlements: SettlementsService,
     private webhooks: WebhooksService,
+    private retryConfig: RetryConfigService,
+    private retryQueue: RetryQueueService,
   ) {}
 
   @Cron(CronExpression.EVERY_30_SECONDS)
@@ -36,9 +40,13 @@ export class StellarMonitorService {
     let transactions: any[];
 
     try {
-      transactions = await this.stellar.getAccountTransactions(depositAddress, cursor);
+      transactions = await this.retryQueue.run(
+        'stellar-monitor',
+        this.retryConfig.stellarMonitor,
+        () => this.stellar.getAccountTransactions(depositAddress, cursor),
+      );
     } catch (err) {
-      this.logger.error('Failed to fetch Stellar transactions', err.message);
+      this.logger.error('Failed to fetch Stellar transactions after retries', err.message);
       return;
     }
 

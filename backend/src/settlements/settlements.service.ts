@@ -6,6 +6,8 @@ import axios from 'axios';
 import { Settlement, SettlementStatus } from './entities/settlement.entity';
 import { Payment, PaymentStatus } from '../payments/entities/payment.entity';
 import { WebhooksService } from '../webhooks/webhooks.service';
+import { RetryConfigService } from '../retry/retry-config.service';
+import { RetryQueueService } from '../retry/retry-queue.service';
 
 @Injectable()
 export class SettlementsService {
@@ -18,6 +20,8 @@ export class SettlementsService {
     private paymentsRepo: Repository<Payment>,
     private config: ConfigService,
     private webhooks: WebhooksService,
+    private retryConfig: RetryConfigService,
+    private retryQueue: RetryQueueService,
   ) {}
 
   async initiateSettlement(payment: Payment): Promise<void> {
@@ -54,32 +58,34 @@ export class SettlementsService {
     const partnerKey = this.config.get('PARTNER_API_KEY');
 
     try {
-      const response = await axios.post(
-        `${partnerUrl}/transfers`,
-        {
+      await this.retryQueue.run('settlement', this.retryConfig.settlement, async () => {
+        const response = await axios.post(
+          `${partnerUrl}/transfers`,
+          {
+            amount: settlement.netAmountUsd,
+            currency: 'USD',
+            merchantId: settlement.merchantId,
+            reference: settlement.id,
+          },
+          { headers: { Authorization: `Bearer ${partnerKey}` } },
+        );
+
+        settlement.status = SettlementStatus.COMPLETED;
+        settlement.partnerReference = response.data?.reference;
+        settlement.completedAt = new Date();
+        await this.settlementsRepo.save(settlement);
+
+        payment.status = PaymentStatus.SETTLED;
+        await this.paymentsRepo.save(payment);
+
+        await this.webhooks.dispatch(settlement.merchantId, 'payment.settled', {
+          paymentId: payment.id,
+          settlementId: settlement.id,
           amount: settlement.netAmountUsd,
-          currency: 'USD',
-          merchantId: settlement.merchantId,
-          reference: settlement.id,
-        },
-        { headers: { Authorization: `Bearer ${partnerKey}` } },
-      );
-
-      settlement.status = SettlementStatus.COMPLETED;
-      settlement.partnerReference = response.data?.reference;
-      settlement.completedAt = new Date();
-      await this.settlementsRepo.save(settlement);
-
-      payment.status = PaymentStatus.SETTLED;
-      await this.paymentsRepo.save(payment);
-
-      await this.webhooks.dispatch(settlement.merchantId, 'payment.settled', {
-        paymentId: payment.id,
-        settlementId: settlement.id,
-        amount: settlement.netAmountUsd,
+        });
       });
     } catch (err) {
-      this.logger.error(`Settlement failed for ${settlement.id}`, err.message);
+      this.logger.error(`Settlement failed for ${settlement.id} after all retries`, err.message);
 
       settlement.status = SettlementStatus.FAILED;
       settlement.failureReason = err.message;

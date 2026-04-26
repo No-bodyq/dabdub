@@ -4,6 +4,8 @@ import { Repository } from 'typeorm';
 import * as crypto from 'crypto';
 import axios from 'axios';
 import { Webhook } from './entities/webhook.entity';
+import { RetryConfigService } from '../retry/retry-config.service';
+import { RetryQueueService } from '../retry/retry-queue.service';
 
 @Injectable()
 export class WebhooksService {
@@ -12,6 +14,8 @@ export class WebhooksService {
   constructor(
     @InjectRepository(Webhook)
     private webhooksRepo: Repository<Webhook>,
+    private retryConfig: RetryConfigService,
+    private retryQueue: RetryQueueService,
   ) {}
 
   async dispatch(merchantId: string, event: string, payload: Record<string, any>): Promise<void> {
@@ -28,20 +32,22 @@ export class WebhooksService {
     for (const webhook of matchingWebhooks) {
       const signature = this.sign(body, webhook.secret);
       try {
-        await axios.post(webhook.url, body, {
-          headers: {
-            'Content-Type': 'application/json',
-            'X-CheesePay-Signature': signature,
-            'X-CheesePay-Event': event,
-          },
-          timeout: 10000,
-        });
+        await this.retryQueue.run(`webhook:${webhook.id}`, this.retryConfig.webhook, () =>
+          axios.post(webhook.url, body, {
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CheesePay-Signature': signature,
+              'X-CheesePay-Event': event,
+            },
+            timeout: 10000,
+          }),
+        );
 
         webhook.lastDeliveredAt = new Date();
         webhook.failureCount = 0;
         await this.webhooksRepo.save(webhook);
       } catch (err) {
-        this.logger.warn(`Webhook delivery failed to ${webhook.url}: ${err.message}`);
+        this.logger.warn(`Webhook delivery failed to ${webhook.url} after all retries: ${err.message}`);
         webhook.failureCount += 1;
         if (webhook.failureCount >= 10) webhook.isActive = false;
         await this.webhooksRepo.save(webhook);
