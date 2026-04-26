@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import Redis from 'ioredis';
 import { gzipSync, gunzipSync } from 'node:zlib';
+import { MetricsService } from '../prometheus/metrics.service';
 
 interface CacheEntry<T> {
   value: T;
@@ -20,7 +21,7 @@ export class CacheService implements OnModuleDestroy {
   // Only compress "large" payloads (bytes of JSON string).
   private readonly compressThresholdBytes = 8 * 1024;
 
-  constructor() {
+  constructor(private readonly metrics: MetricsService) {
     const redisUrl = process.env.REDIS_URL;
     const host = process.env.REDIS_HOST;
     const port = process.env.REDIS_PORT ? Number(process.env.REDIS_PORT) : undefined;
@@ -36,6 +37,27 @@ export class CacheService implements OnModuleDestroy {
         maxRetriesPerRequest: 1,
       });
     }
+  }
+
+  private keyPattern(key: string): string {
+    if (key.startsWith('exchange-rate:') || key.startsWith('exchange_rate:') || key.startsWith('rates:')) {
+      return 'exchange-rate';
+    }
+
+    if (key.startsWith('idempotency:payment:')) {
+      return 'idempotency:payment';
+    }
+
+    if (key.startsWith('session:blacklist:')) {
+      return 'session:blacklist';
+    }
+
+    const [prefix] = key.split(':');
+    return prefix || 'unknown';
+  }
+
+  private recordLookup(key: string, result: 'hit' | 'miss'): void {
+    this.metrics.recordCacheLookup(this.keyPattern(key), result);
   }
 
   async onModuleDestroy(): Promise<void> {
@@ -99,16 +121,27 @@ export class CacheService implements OnModuleDestroy {
     const redis = await this.ensureRedisConnected();
     if (redis) {
       const raw = await redis.get(key);
-      if (!raw) return undefined;
-      return this.decode<T>(raw);
+      if (!raw) {
+        this.recordLookup(key, 'miss');
+        return undefined;
+      }
+
+      const value = this.decode<T>(raw);
+      this.recordLookup(key, value === undefined ? 'miss' : 'hit');
+      return value;
     }
 
     const entry = this.store.get(key) as CacheEntry<T> | undefined;
-    if (!entry) return undefined;
-    if (Date.now() > entry.expiresAt) {
-      this.store.delete(key);
+    if (!entry) {
+      this.recordLookup(key, 'miss');
       return undefined;
     }
+    if (Date.now() > entry.expiresAt) {
+      this.store.delete(key);
+      this.recordLookup(key, 'miss');
+      return undefined;
+    }
+    this.recordLookup(key, 'hit');
     return entry.value;
   }
 
