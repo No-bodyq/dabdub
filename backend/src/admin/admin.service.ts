@@ -412,5 +412,59 @@ export class AdminService {
       throw new BadRequestException('Invalid entity type');
     }
   }
+
+  async getAdminPayments(query: {
+    page: number;
+    limit: number;
+    merchantId?: string;
+    status?: string;
+    network?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    minAmount?: string;
+  }) {
+    const qb = this.paymentsRepo
+      .createQueryBuilder('payment')
+      .leftJoinAndSelect('payment.merchant', 'merchant')
+      .orderBy('payment.createdAt', 'DESC');
+
+    if (query.merchantId) qb.andWhere('payment.merchantId = :merchantId', { merchantId: query.merchantId });
+    if (query.status) qb.andWhere('payment.status = :status', { status: query.status });
+    if (query.network) qb.andWhere('payment.network = :network', { network: query.network });
+    if (query.dateFrom) qb.andWhere('payment.createdAt >= :dateFrom', { dateFrom: new Date(query.dateFrom) });
+    if (query.dateTo) qb.andWhere('payment.createdAt <= :dateTo', { dateTo: new Date(query.dateTo) });
+    if (query.minAmount) qb.andWhere('payment.amountUsd >= :minAmount', { minAmount: parseFloat(query.minAmount) });
+
+    const [items, total] = await qb
+      .skip((query.page - 1) * query.limit)
+      .take(query.limit)
+      .getManyAndCount();
+
+    const stellarNetwork = process.env.STELLAR_NETWORK === 'PUBLIC' ? 'public' : 'testnet';
+    const data = items.map((p) => ({
+      ...p,
+      stellarExplorerUrl: p.txHash
+        ? `https://stellar.expert/explorer/${stellarNetwork}/tx/${p.txHash}`
+        : null,
+    }));
+
+    return { data, total, page: query.page, limit: query.limit, pages: Math.ceil(total / query.limit) };
+  }
+
+  async getAdminPaymentById(id: string) {
+    const payment = await this.paymentsRepo.findOne({
+      where: { id },
+      relations: ['merchant', 'settlement'],
+    });
+    if (!payment) throw new NotFoundException('Payment not found');
+
+    const stellarNetwork = process.env.STELLAR_NETWORK === 'PUBLIC' ? 'public' : 'testnet';
+    return {
+      ...payment,
+      stellarExplorerUrl: payment.txHash
+        ? `https://stellar.expert/explorer/${stellarNetwork}/tx/${payment.txHash}`
+        : null,
+    };
+  }
 }
 

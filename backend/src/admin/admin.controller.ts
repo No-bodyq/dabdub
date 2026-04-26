@@ -12,7 +12,8 @@ import {
   Headers,
   Res,
 } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiParam } from '@nestjs/swagger';
+import { QueryAdminPaymentsDto } from './dto/query-admin-payments.dto';
 import { Request, Response } from 'express';
 import { AdminService } from './admin.service';
 import { MerchantStatus, MerchantRole } from '../merchants/entities/merchant.entity';
@@ -173,6 +174,30 @@ export class AdminController {
     } else {
       res.json(result);
     }
+  }
+
+  // ── Platform-wide Payment Oversight ──────────────────────────────────────
+
+  @Get('payments')
+  @ApiOperation({ summary: 'Get all payments across all merchants (paginated, filterable)' })
+  getAdminPayments(@Query() query: QueryAdminPaymentsDto) {
+    return this.adminService.getAdminPayments({
+      page: query.page ?? 1,
+      limit: query.limit ?? 20,
+      merchantId: query.merchantId,
+      status: query.status,
+      network: query.network,
+      dateFrom: query.dateFrom,
+      dateTo: query.dateTo,
+      minAmount: query.minAmount,
+    });
+  }
+
+  @Get('payments/:id')
+  @ApiOperation({ summary: 'Get full payment detail by ID' })
+  @ApiParam({ name: 'id', description: 'Payment ID' })
+  getAdminPaymentById(@Param('id') id: string) {
+    return this.adminService.getAdminPaymentById(id);
   }
 
   // ── Generic Soft/Hard Delete and Restore ───────────────────────────────────

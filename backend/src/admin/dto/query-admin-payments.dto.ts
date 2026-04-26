@@ -10,10 +10,7 @@ import {
   IsNumberString,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import {
-  TransactionStatus,
-  TransactionType,
-} from '../../transactions/entities/transaction.entity';
+import { PaymentStatus, PaymentNetwork } from '../../payments/entities/payment.entity';
 
 export class QueryAdminPaymentsDto {
   @ApiPropertyOptional({ example: 1 })
@@ -31,23 +28,20 @@ export class QueryAdminPaymentsDto {
   @Max(100)
   limit?: number = 20;
 
-  @ApiPropertyOptional({ description: 'Filter by merchant user ID' })
+  @ApiPropertyOptional({ description: 'Filter by merchant ID' })
   @IsOptional()
   @IsString()
   merchantId?: string;
 
-  @ApiPropertyOptional({ enum: TransactionStatus })
+  @ApiPropertyOptional({ enum: PaymentStatus })
   @IsOptional()
-  @IsEnum(TransactionStatus)
-  status?: TransactionStatus;
+  @IsEnum(PaymentStatus)
+  status?: PaymentStatus;
 
-  @ApiPropertyOptional({
-    enum: TransactionType,
-    description: 'Filter by transaction network/type',
-  })
+  @ApiPropertyOptional({ enum: PaymentNetwork })
   @IsOptional()
-  @IsEnum(TransactionType)
-  network?: TransactionType;
+  @IsEnum(PaymentNetwork)
+  network?: PaymentNetwork;
 
   @ApiPropertyOptional({ example: '2026-01-01T00:00:00Z' })
   @IsOptional()
@@ -59,7 +53,7 @@ export class QueryAdminPaymentsDto {
   @IsDateString()
   dateTo?: string;
 
-  @ApiPropertyOptional({ example: '10.00', description: 'Minimum USDC amount' })
+  @ApiPropertyOptional({ example: '10.00', description: 'Minimum USD amount' })
   @IsOptional()
   @IsNumberString()
   minAmount?: string;
