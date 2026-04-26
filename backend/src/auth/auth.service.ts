@@ -7,6 +7,7 @@ import { Merchant, MerchantStatus } from '../merchants/entities/merchant.entity'
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import type { AuthTokenResponseDto } from './dto/auth-token-response.dto';
+import { CacheService } from '../cache/cache.service';
 
 @Injectable()
 export class AuthService {
@@ -14,6 +15,7 @@ export class AuthService {
     @InjectRepository(Merchant)
     private merchantsRepo: Repository<Merchant>,
     private jwtService: JwtService,
+    private cacheService: CacheService,
   ) {}
 
   async register(dto: RegisterDto): Promise<AuthTokenResponseDto> {
@@ -46,6 +48,15 @@ export class AuthService {
 
     const token = this.signToken(merchant.id, merchant.email, merchant.role);
     return { accessToken: token, merchant };
+  }
+
+  async logout(jti: string, ttlSeconds: number): Promise<void> {
+    await this.cacheService.set(`session:blacklist:${jti}`, true, { ttlSeconds });
+  }
+
+  async isBlacklisted(jti: string): Promise<boolean> {
+    const entry = await this.cacheService.get<boolean>(`session:blacklist:${jti}`);
+    return entry === true;
   }
 
   async findMerchantByApiKey(rawKey: string): Promise<Merchant | null> {

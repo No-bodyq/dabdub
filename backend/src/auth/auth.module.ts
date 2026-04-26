@@ -8,11 +8,13 @@ import { AuthController } from './auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtAuthGuard } from './guards/jwt.guard';
 import { Merchant } from '../merchants/entities/merchant.entity';
+import { CacheModule } from '../cache/cache.module';
 
 @Global()
 @Module({
   imports: [
     TypeOrmModule.forFeature([Merchant]),
+    CacheModule,
     PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],

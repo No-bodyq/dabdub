@@ -28,7 +28,7 @@ export class AuditService {
       after: dto.after,
       ip: dto.ip,
     });
-    
+
     await this.auditLogRepo.save(auditLog);
   }
 }
